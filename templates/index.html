@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket Router Portal</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #0d1117;
+    --sidebar-bg:  #161b22;
+    --card:        #21262d;
+    --card2:       #2d333b;
+    --border:      #30363d;
+    --accent:      #58a6ff;
+    --accent-dim:  #1f6feb33;
+    --green:       #3fb950;
+    --red:         #f85149;
+    --yellow:      #d29922;
+    --purple:      #bc8cff;
+    --text:        #c9d1d9;
+    --muted:       #8b949e;
+    --font:        'Segoe UI', system-ui, sans-serif;
+    --mono:        'Cascadia Code', 'Consolas', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+  #sidebar-header {
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  #sidebar-header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  #sidebar-header p {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  nav { flex: 1; padding: 8px 0; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 2px 8px;
+    color: var(--muted);
+    font-size: 13px;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--card); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+  .nav-item svg { flex-shrink: 0; }
+  #sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Main ── */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #topbar {
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #topbar h2 { font-size: 15px; font-weight: 600; flex: 1; }
+  #run-status-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+  .badge-idle    { background: #30363d; color: var(--muted); }
+  .badge-running { background: #1f6feb; color: #fff; animation: pulse 1.5s infinite; }
+  .badge-done    { background: #238636; color: #fff; }
+  .badge-error   { background: #da3633; color: #fff; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+  #content { flex: 1; overflow-y: auto; padding: 24px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h3 .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+
+  /* ── Forms ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-grid.single { grid-template-columns: 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .form-group input, .form-group select, .form-group textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--accent);
+  }
+  .form-group textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-size: 12px; }
+  .form-group select option { background: var(--card); }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 13px; }
+  .toggle-desc  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle-track::before {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    left: 3px; top: 3px;
+    transition: transform .2s;
+  }
+  .toggle input:checked + .toggle-track { background: var(--green); }
+  .toggle input:checked + .toggle-track::before { transform: translateX(16px); }
+
+  /* Tag input */
+  .tag-input-wrap {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    padding: 5px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 36px;
+    cursor: text;
+  }
+  .tag-input-wrap:focus-within { border-color: var(--accent); }
+  .tag {
+    background: var(--card2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .tag .remove {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1;
+  }
+  .tag .remove:hover { color: var(--red); }
+  .tag-input {
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    min-width: 80px;
+    flex: 1;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .15s, filter .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:active { filter: brightness(.95); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+  .btn-primary   { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+  .btn-success   { background: var(--green); color: #0d1117; }
+  .btn-danger    { background: var(--red); color: #fff; }
+  .btn-secondary { background: var(--card2); color: var(--text); border-color: var(--border); }
+  .btn-warning   { background: var(--yellow); color: #0d1117; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-run {
+    background: #238636;
+    color: #fff;
+    border-color: #2ea043;
+    padding: 9px 22px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .btn-run:hover { background: #2ea043; }
+
+  /* ── Terminal ── */
+  #terminal {
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    height: 420px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .log-line { white-space: pre-wrap; word-break: break-all; }
+  .log-sep   { color: #444d56; }
+  .log-info  { color: var(--text); }
+  .log-ok    { color: var(--green); }
+  .log-warn  { color: var(--yellow); }
+  .log-err   { color: var(--red); }
+  .log-dry   { color: var(--purple); }
+  .log-head  { color: var(--accent); font-weight: bold; }
+  .log-agent { color: #79c0ff; }
+
+  /* ── Stats grid ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-card .val {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-card .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat-green { color: var(--green); }
+  .stat-red   { color: var(--red); }
+  .stat-yellow { color: var(--yellow); }
+  .stat-blue  { color: var(--accent); }
+
+  /* ── Tables ── */
+  .tbl-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--card2); }
+  td input, td select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 4px 7px;
+    width: 100%;
+    outline: none;
+  }
+  td input:focus, td select:focus { border-color: var(--accent); }
+  td textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 4px 7px;
+    width: 100%;
+    min-width: 220px;
+    resize: vertical;
+    font-family: var(--font);
+    outline: none;
+  }
+  td textarea:focus { border-color: var(--accent); }
+
+  /* ── Routable pill ── */
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .pill:hover { opacity: .8; }
+  .pill-yes { background: #1a3a25; color: var(--green); border: 1px solid #2ea043; }
+  .pill-no  { background: #2d1c1c; color: var(--red); border: 1px solid #da3633; }
+
+  /* ── History table ── */
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-ts { color: var(--muted); min-width: 140px; font-family: var(--mono); }
+  .history-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .hb-dry  { background: #2d1f5e; color: var(--purple); }
+  .hb-live { background: #1a3a25; color: var(--green); }
+  .history-stats { color: var(--muted); }
+  .history-stats span { margin-right: 12px; }
+  .history-stats .hg { color: var(--green); }
+  .history-stats .hr { color: var(--red); }
+  .history-stats .hy { color: var(--yellow); }
+
+  /* ── Env ── */
+  .env-row {
+    display: grid;
+    grid-template-columns: 180px 1fr 80px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .env-row:last-child { border-bottom: none; }
+  .env-key  { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .env-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+    width: 100%;
+  }
+  .env-input:focus { border-color: var(--accent); }
+  .env-status {
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .env-set   { color: var(--green); }
+  .env-unset { color: var(--red); }
+
+  /* ── Toasts ── */
+  #toast-wrap {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+  }
+  .toast {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    min-width: 220px;
+    max-width: 360px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slide-in .25s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+  @keyframes slide-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .toast.ok   { border-left: 3px solid var(--green); }
+  .toast.err  { border-left: 3px solid var(--red); }
+  .toast.warn { border-left: 3px solid var(--yellow); }
+
+  /* ── Misc ── */
+  .section-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .run-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .dry-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .terminal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .terminal-header span { font-size: 12px; color: var(--muted); }
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .path-note {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    word-break: break-all;
+  }
+  hr.section-sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* ── Tool terminal (shared style, separate elements per tab) ── */
+  .terminal-box {
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    height: 320px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  /* ── Report bar chart ── */
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .bar-label { min-width: 130px; color: var(--muted); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; background: var(--card2); border-radius: 3px; height: 14px; overflow: hidden; }
+  .bar-fill  { height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s; }
+  .bar-val   { min-width: 36px; color: var(--text); font-size: 11px; }
+
+  /* ── Search source badge ── */
+  .src-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .src-summary { background:#1f3a1f; color:var(--green); }
+  .src-note    { background:#1f3060; color:#79c0ff; }
+  .src-audit   { background:#3a1f1f; color:var(--yellow); }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>Ticket Router</h1>
+    <p>ConnectWise + Claude AI</p>
+  </div>
+  <nav>
+    <div class="nav-item active" data-tab="run" onclick="switchTab('run', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"/></svg>
+      Run
+    </div>
+    <div class="nav-item" data-tab="config" onclick="switchTab('config', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.474l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg>
+      Configuration
+    </div>
+    <div class="nav-item" data-tab="agents" onclick="switchTab('agents', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+      Agents
+    </div>
+    <div class="nav-item" data-tab="boards" onclick="switchTab('boards', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z"/></svg>
+      Boards &amp; Statuses
+    </div>
+    <div class="nav-item" data-tab="members" onclick="switchTab('members', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zM11 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm.5 2.5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4zm2 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1h-2zm0 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1h-2z"/></svg>
+      Members
+    </div>
+    <div class="nav-item" data-tab="env" onclick="switchTab('env', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+      Environment
+    </div>
+
+    <div style="padding:8px 16px 4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px">Tools</div>
+
+    <div class="nav-item" data-tab="bulk-edit" onclick="switchTab('bulk-edit', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
+      Bulk Editor
+    </div>
+    <div class="nav-item" data-tab="search" onclick="switchTab('search', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+      Ticket Search
+    </div>
+    <div class="nav-item" data-tab="report" onclick="switchTab('report', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 11H2v3h2v-3zm5-4H7v7h2V7zm5-5v12h-2V2h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1h-2zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-3z"/></svg>
+      Report
+    </div>
+  </nav>
+  <div id="sidebar-footer">v1.0 · core12</div>
+</div>
+
+<!-- ── Main ── -->
+<div id="main">
+  <div id="topbar">
+    <h2 id="topbar-title">Run</h2>
+    <span id="run-status-badge" class="badge-idle">Idle</span>
+    <button class="btn btn-secondary btn-sm" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+
+  <div id="content">
+
+    <!-- ══ RUN TAB ══ -->
+    <div id="tab-run" class="tab-panel active">
+      <div class="stats-grid" id="summary-stats" style="display:none">
+        <div class="stat-card"><div class="val stat-green" id="s-routed">0</div><div class="lbl">Routed</div></div>
+        <div class="stat-card"><div class="val stat-yellow" id="s-skipped">0</div><div class="lbl">Skipped</div></div>
+        <div class="stat-card"><div class="val stat-red" id="s-errors">0</div><div class="lbl">Errors</div></div>
+        <div class="stat-card"><div class="val stat-blue" id="s-mode">—</div><div class="lbl">Mode</div></div>
+      </div>
+
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M6.271 5.055a.5.5 0 0 1 .52.038l3.5 2.5a.5.5 0 0 1 0 .814l-3.5 2.5A.5.5 0 0 1 6 10.5v-5a.5.5 0 0 1 .271-.445z"/></svg>
+          Controls
+        </h3>
+        <div class="run-controls">
+          <button id="btn-run" class="btn btn-run" onclick="startRun()">▶ Run Router</button>
+          <button id="btn-stop" class="btn btn-danger" onclick="stopRun()" style="display:none">⏹ Stop</button>
+          <div class="dry-toggle-row">
+            <label class="toggle" title="Dry run — no changes made">
+              <input type="checkbox" id="dry-run-override" checked>
+              <span class="toggle-track"></span>
+            </label>
+            <span id="dry-label">Dry Run (no changes)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 16px;">
+        <div class="terminal-header">
+          <span>Live Output</span>
+          <button class="btn btn-secondary btn-sm" onclick="clearTerminal()">Clear</button>
+        </div>
+        <div id="terminal"><span class="log-sep">Waiting for run…</span></div>
+      </div>
+
+      <div class="card" id="history-card">
+        <h3>Run History</h3>
+        <div id="history-list"><div class="empty-state">No runs yet.</div></div>
+      </div>
+    </div>
+
+    <!-- ══ CONFIG TAB ══ -->
+    <div id="tab-config" class="tab-panel">
+      <div class="card">
+        <h3>Router Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Claude Model</label>
+            <select id="cfg-model">
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6 (default)</option>
+              <option value="claude-opus-4-6">claude-opus-4-6</option>
+              <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Assigned Status (after routing)</label>
+            <input type="text" id="cfg-assigned-status" placeholder="e.g. Assigned">
+          </div>
+          <div class="form-group">
+            <label>Route to Board (after routing)</label>
+            <input type="text" id="cfg-route-to-board" placeholder="e.g. Support">
+          </div>
+          <div class="form-group">
+            <label>Max Tickets Per Run</label>
+            <input type="number" id="cfg-max-tickets" min="1" max="500" placeholder="50">
+          </div>
+          <div class="form-group">
+            <label>HTTP Timeout (seconds)</label>
+            <input type="number" id="cfg-timeout" min="5" max="120" placeholder="20">
+          </div>
+          <div class="form-group">
+            <label>Page Size (CW API)</label>
+            <input type="number" id="cfg-page-size" min="1" max="1000" placeholder="200">
+          </div>
+          <div class="form-group">
+            <label>Mappings File Path</label>
+            <input type="text" id="cfg-mappings-path" placeholder="/path/to/mappings.json">
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <div class="form-grid single">
+          <div class="form-group">
+            <label>Boards to Scan <span style="color:var(--muted)">(press Enter or comma to add)</span></label>
+            <div class="tag-input-wrap" id="wrap-boards" onclick="this.querySelector('input').focus()">
+              <input class="tag-input" id="input-boards" placeholder="Add board…" onkeydown="tagKeydown(event,'boards')">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Route-From Statuses</label>
+            <div class="tag-input-wrap" id="wrap-statuses" onclick="this.querySelector('input').focus()">
+              <input class="tag-input" id="input-statuses" placeholder="Add status…" onkeydown="tagKeydown(event,'statuses')">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Unrouted Owner Identifiers <span style="color:var(--muted)">(tickets with these owners get re-routed)</span></label>
+            <div class="tag-input-wrap" id="wrap-unrouted" onclick="this.querySelector('input').focus()">
+              <input class="tag-input" id="input-unrouted" placeholder="Add identifier…" onkeydown="tagKeydown(event,'unrouted')">
+            </div>
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Dry Run by Default</div>
+              <div class="toggle-desc">When enabled, runs will not modify any tickets unless overridden in the Run tab</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="cfg-dry-run"><span class="toggle-track"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Add Routing Note</div>
+              <div class="toggle-desc">Post an internal note to each ticket explaining the routing decision</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="cfg-add-note"><span class="toggle-track"></span></label>
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <div class="form-grid single">
+          <div class="form-group">
+            <label>Note Template <span style="color:var(--muted)">(use {display_name} and {reason})</span></label>
+            <textarea id="cfg-note-template" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+          <button class="btn btn-secondary" onclick="loadConfig()">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ AGENTS TAB ══ -->
+    <div id="tab-agents" class="tab-panel">
+      <div class="card">
+        <h3>
+          Agent Routing
+          <span class="badge" style="background:#1a3a25;color:var(--green)" id="routable-count"></span>
+        </h3>
+        <p style="color:var(--muted);font-size:12px;margin-bottom:14px">
+          Toggle <strong>Routable</strong> to include/exclude an agent from AI selection.
+          Click any cell to edit inline. Changes are saved with the Save button.
+        </p>
+        <div class="tbl-wrap">
+          <table id="agents-table">
+            <thead>
+              <tr>
+                <th>Identifier</th>
+                <th>Display Name</th>
+                <th>Routable</th>
+                <th style="width:40%">Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="agents-tbody"></tbody>
+          </table>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="saveAgents()">Save Agents</button>
+          <button class="btn btn-secondary" onclick="addAgentRow()">+ Add Agent</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ BOARDS & STATUSES TAB ══ -->
+    <div id="tab-boards" class="tab-panel">
+      <div class="card">
+        <h3>Boards</h3>
+        <div class="tbl-wrap">
+          <table id="boards-table">
+            <thead><tr><th>Board Name</th><th>CW Board ID</th><th>Actions</th></tr></thead>
+            <tbody id="boards-tbody"></tbody>
+          </table>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="saveBoards()">Save Boards</button>
+          <button class="btn btn-secondary" onclick="addBoardRow()">+ Add Board</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Statuses <span style="font-size:12px;color:var(--muted);font-weight:400">(grouped by board)</span></h3>
+        <div id="statuses-accordion"></div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="saveStatuses()">Save All Statuses</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MEMBERS TAB ══ -->
+    <div id="tab-members" class="tab-panel">
+      <div class="card">
+        <h3>Members</h3>
+        <p style="color:var(--muted);font-size:12px;margin-bottom:14px">
+          Maps ConnectWise member identifiers to their numeric member IDs.
+          These IDs are used when assigning ticket ownership.
+        </p>
+        <div class="tbl-wrap">
+          <table id="members-table">
+            <thead><tr><th>Identifier</th><th>CW Member ID</th><th>Actions</th></tr></thead>
+            <tbody id="members-tbody"></tbody>
+          </table>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="saveMembers()">Save Members</button>
+          <button class="btn btn-secondary" onclick="addMemberRow()">+ Add Member</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ENVIRONMENT TAB ══ -->
+    <div id="tab-env" class="tab-panel">
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+          API Credentials
+          <span class="badge" style="background:#2d1f1f;color:var(--yellow);font-weight:500;font-size:11px">Stored in .env</span>
+        </h3>
+        <p style="color:var(--muted);font-size:12px;margin-bottom:8px">
+          Sensitive keys are shown masked. Type a new value to update; leave masked value to keep existing.
+        </p>
+        <div id="env-path" class="path-note" style="margin-bottom:16px"></div>
+        <div id="env-rows"></div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="saveEnv()">Save Credentials</button>
+          <button class="btn btn-secondary" onclick="loadEnv()">Reload</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ BULK EDITOR TAB ══ -->
+    <div id="tab-bulk-edit" class="tab-panel">
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10z"/></svg>
+          Ticket Filters
+        </h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Board</label>
+            <input type="text" id="be-board" value="Dispatch" placeholder="e.g. Dispatch">
+          </div>
+          <div class="form-group">
+            <label>Source Status (tickets to target)</label>
+            <input type="text" id="be-source-status" value="New" placeholder="e.g. New">
+          </div>
+          <div class="form-group">
+            <label>Company contains (optional)</label>
+            <input type="text" id="be-company-filter" placeholder="e.g. BLUR Workshop">
+          </div>
+          <div class="form-group">
+            <label>Summary keywords <span style="color:var(--muted)">(comma-separated, any match)</span></label>
+            <input type="text" id="be-summary-any" placeholder="e.g. Disk Volume, offline">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Actions</h3>
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div class="toggle-row">
+            <div><div class="toggle-label">Assign to member</div></div>
+            <label class="toggle"><input type="checkbox" id="be-do-assign" onchange="document.getElementById('be-assign-row').style.display=this.checked?'':'none'"><span class="toggle-track"></span></label>
+          </div>
+          <div id="be-assign-row" style="display:none;padding:8px 0">
+            <div class="form-group"><label>Member identifier</label><input type="text" id="be-assign-to" placeholder="e.g. jdunn"></div>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">Change status</div></div>
+            <label class="toggle"><input type="checkbox" id="be-do-status" onchange="document.getElementById('be-status-row').style.display=this.checked?'':'none'"><span class="toggle-track"></span></label>
+          </div>
+          <div id="be-status-row" style="display:none;padding:8px 0">
+            <div class="form-group"><label>New status name</label><input type="text" id="be-new-status" placeholder="e.g. Assigned"></div>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">Change ticket type</div></div>
+            <label class="toggle"><input type="checkbox" id="be-do-type" onchange="document.getElementById('be-type-row').style.display=this.checked?'':'none'"><span class="toggle-track"></span></label>
+          </div>
+          <div id="be-type-row" style="display:none;padding:8px 0">
+            <div class="form-group"><label>New type name</label><input type="text" id="be-new-type" placeholder="e.g. Remote"></div>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">Add internal note</div></div>
+            <label class="toggle"><input type="checkbox" id="be-do-note" onchange="document.getElementById('be-note-row').style.display=this.checked?'':'none'"><span class="toggle-track"></span></label>
+          </div>
+          <div id="be-note-row" style="display:none;padding:8px 0">
+            <div class="form-group"><label>Note text</label><textarea id="be-note-text" rows="2" placeholder="Note to add as internal analysis…"></textarea></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Run</h3>
+        <div class="run-controls">
+          <button id="be-btn-run" class="btn btn-run" onclick="startBulkEdit()">▶ Run Bulk Edit</button>
+          <button id="be-btn-stop" class="btn btn-danger" onclick="stopToolRun()" style="display:none">⏹ Stop</button>
+          <div class="dry-toggle-row">
+            <label class="toggle" title="Diagnostic mode — no API writes">
+              <input type="checkbox" id="be-diagnostic" checked>
+              <span class="toggle-track"></span>
+            </label>
+            <span id="be-mode-label" style="color:var(--muted)">Diagnostic (no changes)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:16px">
+        <div class="terminal-header">
+          <span>Live Output</span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('terminal-bulk').innerHTML=''">Clear</button>
+        </div>
+        <div id="terminal-bulk" class="terminal-box"><span class="log-sep">Waiting for run…</span></div>
+      </div>
+    </div>
+
+    <!-- ══ TICKET SEARCH TAB ══ -->
+    <div id="tab-search" class="tab-panel">
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+          Search Parameters
+        </h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Search Phrase <span style="color:var(--red)">*</span></label>
+            <input type="text" id="sr-phrase" placeholder="e.g. VPN, Signature, BLUR…">
+          </div>
+          <div class="form-group">
+            <label>Company filter (optional)</label>
+            <input type="text" id="sr-company" placeholder="Partial match, e.g. BLUR">
+          </div>
+          <div class="form-group">
+            <label>Days back (0 = all history)</label>
+            <input type="number" id="sr-days" value="90" min="0">
+          </div>
+          <div class="form-group">
+            <label>Max results</label>
+            <input type="number" id="sr-max" value="200" min="1" max="2000">
+          </div>
+        </div>
+        <hr class="section-sep">
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div class="toggle-row">
+            <div><div class="toggle-label">Only open tickets</div></div>
+            <label class="toggle"><input type="checkbox" id="sr-only-open"><span class="toggle-track"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Search audit trail</div>
+              <div class="toggle-desc">Slower — scans CW audit trail entries for each ticket</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="sr-audit"><span class="toggle-track"></span></label>
+          </div>
+        </div>
+        <div class="section-actions">
+          <button id="sr-btn-run" class="btn btn-run" onclick="startSearch()">▶ Search</button>
+          <button id="sr-btn-stop" class="btn btn-danger" onclick="stopToolRun()" style="display:none">⏹ Stop</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:16px">
+        <div class="terminal-header">
+          <span>Progress</span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('terminal-search').innerHTML=''">Clear</button>
+        </div>
+        <div id="terminal-search" class="terminal-box" style="height:220px"><span class="log-sep">Waiting for search…</span></div>
+      </div>
+
+      <div class="card">
+        <h3>Results <span id="sr-result-count" class="badge" style="background:var(--card2);color:var(--muted)">—</span></h3>
+        <div class="tbl-wrap">
+          <table id="sr-results-table">
+            <thead><tr><th>#</th><th>Ticket ID</th><th>Company</th><th>Summary</th><th>Found In</th></tr></thead>
+            <tbody id="sr-results-tbody"><tr><td colspan="5" class="empty-state" style="padding:20px;text-align:center">Run a search to see results.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ REPORT TAB ══ -->
+    <div id="tab-report" class="tab-panel">
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 11H2v3h2v-3zm5-4H7v7h2V7zm5-5v12h-2V2h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1h-2zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-3z"/></svg>
+          Report Filters
+        </h3>
+
+        <!-- Date range -->
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Date Range</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date from</label>
+            <input type="date" id="rp-date-from">
+          </div>
+          <div class="form-group">
+            <label>Date to</label>
+            <input type="date" id="rp-date-to">
+          </div>
+          <div class="form-group">
+            <label>Min age (days) <span style="color:var(--muted)">optional</span></label>
+            <input type="number" id="rp-min-age" min="0" placeholder="e.g. 1">
+          </div>
+          <div class="form-group">
+            <label>Max age (days) <span style="color:var(--muted)">optional</span></label>
+            <input type="number" id="rp-max-age" min="0" placeholder="e.g. 365">
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <!-- Exclusion rule -->
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Outlier Exclusion</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Exclude tickets closed in month # <span style="color:var(--muted)">(1–12, blank = off)</span></label>
+            <input type="number" id="rp-excl-month" min="1" max="12" placeholder="e.g. 11 for Nov">
+          </div>
+          <div class="form-group">
+            <label>…where time-to-close exceeds (days)</label>
+            <input type="number" id="rp-excl-month-days" min="0" placeholder="e.g. 50">
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <!-- Company / assignee -->
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Company &amp; Assignee</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Company include <span style="color:var(--muted)">(comma-sep, partial)</span></label>
+            <input type="text" id="rp-company-inc" placeholder="e.g. BLUR Workshop">
+          </div>
+          <div class="form-group">
+            <label>Company exclude</label>
+            <input type="text" id="rp-company-excl" placeholder="e.g. Test, Demo">
+          </div>
+          <div class="form-group">
+            <label>Assignee include</label>
+            <input type="text" id="rp-assignee-inc" placeholder="e.g. akloss">
+          </div>
+          <div class="form-group">
+            <label>Assignee exclude <span style="color:var(--muted)">(filter out entirely)</span></label>
+            <input type="text" id="rp-assignee-excl" placeholder="e.g. contractor1">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Suppress &amp; redistribute <span style="color:var(--muted)">(excluded from charts; tickets redistributed to remaining techs — supportdesk/apibot always suppressed)</span></label>
+            <input type="text" id="rp-assignee-suppress" placeholder="e.g. sjones, tempuser">
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <!-- Board / status / priority -->
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Board / Status / Priority</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Board include</label>
+            <input type="text" id="rp-board-inc" placeholder="e.g. Dispatch, Support">
+          </div>
+          <div class="form-group">
+            <label>Board exclude</label>
+            <input type="text" id="rp-board-excl" placeholder="e.g. Internal">
+          </div>
+          <div class="form-group">
+            <label>Status include</label>
+            <input type="text" id="rp-status-inc" placeholder="e.g. Closed, Resolved">
+          </div>
+          <div class="form-group">
+            <label>Status exclude</label>
+            <input type="text" id="rp-status-excl" placeholder="e.g. Cancelled">
+          </div>
+          <div class="form-group">
+            <label>Priority include</label>
+            <input type="text" id="rp-priority-inc" placeholder="e.g. P1, P2">
+          </div>
+          <div class="form-group">
+            <label>Priority exclude</label>
+            <input type="text" id="rp-priority-excl" placeholder="e.g. P5">
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <!-- Summary / source / team -->
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Summary / Source / Team</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Summary contains any <span style="color:var(--muted)">(comma-sep)</span></label>
+            <input type="text" id="rp-summary-any" placeholder="e.g. VPN, firewall">
+          </div>
+          <div class="form-group">
+            <label>Source include</label>
+            <input type="text" id="rp-source-inc" placeholder="e.g. Email, Phone">
+          </div>
+          <div class="form-group">
+            <label>Team include</label>
+            <input type="text" id="rp-team-inc" placeholder="e.g. Tier 1">
+          </div>
+        </div>
+
+        <hr class="section-sep">
+        <!-- Report branding -->
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Report Branding (PDF)</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Report title</label>
+            <input type="text" id="rp-title" placeholder="Ticket Report" value="Ticket Report">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Subtitle / note</label>
+            <input type="text" id="rp-subtitle" placeholder="Optional subtitle text">
+          </div>
+          <div class="form-group">
+            <label>Footer left</label>
+            <input type="text" id="rp-footer-l" placeholder="Core12" value="Core12">
+          </div>
+          <div class="form-group">
+            <label>Footer right</label>
+            <input type="text" id="rp-footer-r" placeholder="Generated via Core12 Portal" value="Generated via Core12 Portal">
+          </div>
+        </div>
+
+        <div class="section-actions">
+          <button id="rp-btn-run" class="btn btn-run" onclick="startReport()">▶ Generate Report</button>
+          <button id="rp-btn-stop" class="btn btn-danger" onclick="stopToolRun()" style="display:none">⏹ Stop</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:16px">
+        <div class="terminal-header">
+          <span>Progress</span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('terminal-report').innerHTML=''">Clear</button>
+        </div>
+        <div id="terminal-report" class="terminal-box" style="height:160px"><span class="log-sep">Waiting for report…</span></div>
+      </div>
+
+      <div id="rp-results" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+          <button class="btn btn-secondary" onclick="downloadReportPDF()">⬇ Download PDF</button>
+        </div>
+
+        <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
+          <div class="stat-card"><div class="val stat-blue"  id="rp-total">—</div><div class="lbl">Total Tickets</div></div>
+          <div class="stat-card"><div class="val stat-green" id="rp-closed">—</div><div class="lbl">Closed</div></div>
+          <div class="stat-card"><div class="val stat-yellow" id="rp-open">—</div><div class="lbl">Open</div></div>
+          <div class="stat-card"><div class="val stat-blue"  id="rp-avg">—</div><div class="lbl">Avg Close (days)</div></div>
+          <div class="stat-card"><div class="val stat-blue"  id="rp-med">—</div><div class="lbl">Median Close (days)</div></div>
+        </div>
+
+        <div class="form-grid">
+          <div class="card">
+            <h3>By Assignee</h3>
+            <div id="rp-assignee-chart"></div>
+          </div>
+          <div class="card">
+            <h3>By Type <span style="font-size:11px;color:var(--muted);font-weight:400">(top 12)</span></h3>
+            <div id="rp-type-chart"></div>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="card">
+            <h3>By Board / Status</h3>
+            <div class="form-grid">
+              <div>
+                <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Boards</p>
+                <div id="rp-board-list"></div>
+              </div>
+              <div>
+                <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Statuses</p>
+                <div id="rp-status-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>By Priority / Source</h3>
+            <div class="form-grid">
+              <div>
+                <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Priority</p>
+                <div id="rp-priority-list"></div>
+              </div>
+              <div>
+                <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Source</p>
+                <div id="rp-source-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>By Company <span style="font-size:11px;color:var(--muted);font-weight:400">(top 15)</span></h3>
+          <div id="rp-company-chart"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<div id="toast-wrap"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const S = {
+  config:   {},
+  mappings: {},
+  env:      {},
+  tags: { boards: [], statuses: [], unrouted: [] },
+  agentsData: {},   // identifier -> {display_name, routable, description}
+};
+
+let evtSource = null;
+let running   = false;
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+const TITLES = { run:'Run', config:'Configuration', agents:'Agents',
+                 boards:'Boards & Statuses', members:'Members', env:'Environment',
+                 'bulk-edit':'Bulk Ticket Editor', search:'Ticket Search', report:'Report' };
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('topbar-title').textContent = TITLES[tab] || tab;
+  if (tab === 'agents')  renderAgents();
+  if (tab === 'boards')  renderBoards();
+  if (tab === 'members') renderMembers();
+  if (tab === 'env')     loadEnv();
+}
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function toast(msg, type='ok') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = { ok:'✓ ', err:'✕ ', warn:'⚠ ' }[type] + msg;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const cfg = await api('GET', '/api/config');
+  S.config = cfg;
+
+  document.getElementById('cfg-model').value           = cfg.claude_model        || 'claude-sonnet-4-6';
+  document.getElementById('cfg-assigned-status').value = cfg.assigned_status     || '';
+  document.getElementById('cfg-route-to-board').value  = cfg.route_to_board      || '';
+  document.getElementById('cfg-max-tickets').value     = cfg.max_tickets_to_process ?? 50;
+  document.getElementById('cfg-timeout').value         = cfg.timeout_secs        ?? 20;
+  document.getElementById('cfg-page-size').value       = cfg.page_size           ?? 200;
+  document.getElementById('cfg-mappings-path').value   = cfg.mappings_path       || '';
+  document.getElementById('cfg-dry-run').checked       = !!cfg.dry_run;
+  document.getElementById('cfg-add-note').checked      = !!cfg.add_routing_note;
+  document.getElementById('cfg-note-template').value   = cfg.note_template       || '';
+
+  document.getElementById('dry-run-override').checked  = !!cfg.dry_run;
+  updateDryLabel();
+
+  setTags('boards',   cfg.boards_to_scan             || []);
+  setTags('statuses', cfg.route_from_statuses         || []);
+  setTags('unrouted', cfg.unrouted_owner_identifiers  || []);
+}
+
+async function saveConfig() {
+  const cfg = {
+    ...S.config,
+    claude_model:               document.getElementById('cfg-model').value,
+    assigned_status:            document.getElementById('cfg-assigned-status').value.trim(),
+    route_to_board:             document.getElementById('cfg-route-to-board').value.trim(),
+    max_tickets_to_process:     parseInt(document.getElementById('cfg-max-tickets').value) || 50,
+    timeout_secs:               parseInt(document.getElementById('cfg-timeout').value)     || 20,
+    page_size:                  parseInt(document.getElementById('cfg-page-size').value)   || 200,
+    mappings_path:              document.getElementById('cfg-mappings-path').value.trim(),
+    dry_run:                    document.getElementById('cfg-dry-run').checked,
+    add_routing_note:           document.getElementById('cfg-add-note').checked,
+    note_template:              document.getElementById('cfg-note-template').value,
+    boards_to_scan:             S.tags.boards,
+    route_from_statuses:        S.tags.statuses,
+    unrouted_owner_identifiers: S.tags.unrouted,
+  };
+  const r = await api('POST', '/api/config', cfg);
+  if (r.ok) { S.config = cfg; toast('Configuration saved'); }
+  else toast('Save failed: ' + (r.error || 'Unknown'), 'err');
+}
+
+// ── Tag inputs ────────────────────────────────────────────────────────────────
+function setTags(key, values) {
+  S.tags[key] = [...values];
+  renderTags(key);
+}
+
+function renderTags(key) {
+  const wrap  = document.getElementById('wrap-' + key);
+  const input = document.getElementById('input-' + key);
+  wrap.querySelectorAll('.tag').forEach(t => t.remove());
+  S.tags[key].forEach(v => {
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.innerHTML = `${esc(v)} <span class="remove" onclick="removeTag('${key}','${esc(v)}')" title="Remove">×</span>`;
+    wrap.insertBefore(tag, input);
+  });
+}
+
+function removeTag(key, val) {
+  S.tags[key] = S.tags[key].filter(v => v !== val);
+  renderTags(key);
+}
+
+function tagKeydown(e, key) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = e.target.value.replace(/,$/, '').trim();
+    if (val && !S.tags[key].includes(val)) {
+      S.tags[key].push(val);
+      renderTags(key);
+    }
+    e.target.value = '';
+  } else if (e.key === 'Backspace' && e.target.value === '' && S.tags[key].length) {
+    S.tags[key].pop();
+    renderTags(key);
+  }
+}
+
+// ── Mappings ──────────────────────────────────────────────────────────────────
+async function loadMappings() {
+  const m = await api('GET', '/api/mappings');
+  if (m.error) { toast('Could not load mappings: ' + m.error, 'err'); return; }
+  S.mappings = m;
+
+  // Build agents data from agent_routing
+  S.agentsData = {};
+  for (const [id, info] of Object.entries(m.agent_routing || {})) {
+    S.agentsData[id] = { ...info };
+  }
+  updateRoutableCount();
+}
+
+async function saveMappings() {
+  const r = await api('POST', '/api/mappings', S.mappings);
+  return r;
+}
+
+// ── Agents ────────────────────────────────────────────────────────────────────
+function updateRoutableCount() {
+  const count = Object.values(S.agentsData).filter(a => a.routable).length;
+  const el = document.getElementById('routable-count');
+  if (el) el.textContent = count + ' routable';
+}
+
+function renderAgents() {
+  const tbody = document.getElementById('agents-tbody');
+  tbody.innerHTML = '';
+  for (const [id, info] of Object.entries(S.agentsData)) {
+    const tr = document.createElement('tr');
+    tr.dataset.id = id;
+    tr.innerHTML = `
+      <td><input value="${esc(id)}" class="agent-id" data-orig="${esc(id)}" placeholder="identifier"></td>
+      <td><input value="${esc(info.display_name||'')}" class="agent-dn" placeholder="Display Name"></td>
+      <td>
+        <span class="pill ${info.routable ? 'pill-yes':'pill-no'}"
+              onclick="toggleRoutable(this, '${esc(id)}')" title="Click to toggle">
+          ${info.routable ? 'Yes' : 'No'}
+        </span>
+      </td>
+      <td><textarea class="agent-desc" rows="2">${esc(info.description||'')}</textarea></td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteAgent(this, '${esc(id)}')">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+  updateRoutableCount();
+}
+
+function toggleRoutable(el, id) {
+  const current = el.classList.contains('pill-yes');
+  el.classList.toggle('pill-yes', !current);
+  el.classList.toggle('pill-no',  current);
+  el.textContent = current ? 'No' : 'Yes';
+  if (S.agentsData[id]) S.agentsData[id].routable = !current;
+  updateRoutableCount();
+}
+
+function deleteAgent(btn, id) {
+  if (!confirm(`Remove agent "${id}"?`)) return;
+  btn.closest('tr').remove();
+  delete S.agentsData[id];
+  updateRoutableCount();
+}
+
+function addAgentRow() {
+  const tbody = document.getElementById('agents-tbody');
+  const id = 'new_agent_' + Date.now();
+  S.agentsData[id] = { display_name: '', routable: true, description: '' };
+  const tr = document.createElement('tr');
+  tr.dataset.id = id;
+  tr.innerHTML = `
+    <td><input value="${esc(id)}" class="agent-id" data-orig="${esc(id)}" placeholder="identifier"></td>
+    <td><input value="" class="agent-dn" placeholder="Display Name"></td>
+    <td>
+      <span class="pill pill-yes" onclick="toggleRoutable(this, '${esc(id)}')" title="Click to toggle">Yes</span>
+    </td>
+    <td><textarea class="agent-desc" rows="2" placeholder="Description of what this agent handles..."></textarea></td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteAgent(this, '${esc(id)}')">Remove</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelector('input').focus();
+}
+
+async function saveAgents() {
+  const tbody    = document.getElementById('agents-tbody');
+  const newRouting = {};
+  for (const tr of tbody.querySelectorAll('tr')) {
+    const idEl = tr.querySelector('.agent-id');
+    const dnEl = tr.querySelector('.agent-dn');
+    const descEl = tr.querySelector('.agent-desc');
+    const routEl = tr.querySelector('.pill');
+    if (!idEl) continue;
+    const id = idEl.value.trim();
+    if (!id) continue;
+    newRouting[id] = {
+      display_name: dnEl ? dnEl.value.trim() : '',
+      routable:     routEl ? routEl.classList.contains('pill-yes') : false,
+      description:  descEl ? descEl.value.trim() : '',
+    };
+  }
+  S.mappings.agent_routing = newRouting;
+  S.agentsData = { ...newRouting };
+  const r = await saveMappings();
+  if (r && r.ok) { toast('Agents saved'); updateRoutableCount(); }
+  else toast('Save failed: ' + (r?.error || 'Unknown'), 'err');
+}
+
+// ── Boards ────────────────────────────────────────────────────────────────────
+function renderBoards() {
+  const tbody = document.getElementById('boards-tbody');
+  tbody.innerHTML = '';
+  for (const [name, id] of Object.entries(S.mappings.boards || {})) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input value="${esc(name)}" class="board-name" data-orig="${esc(name)}"></td>
+      <td><input value="${esc(String(id))}" class="board-id" type="number"></td>
+      <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+  renderStatusesAccordion();
+}
+
+function addBoardRow() {
+  const tbody = document.getElementById('boards-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input value="" class="board-name" placeholder="Board Name" data-orig=""></td>
+    <td><input value="" class="board-id" type="number" placeholder="ID"></td>
+    <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Remove</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelector('input').focus();
+}
+
+async function saveBoards() {
+  const boards = {};
+  for (const tr of document.querySelectorAll('#boards-tbody tr')) {
+    const name = tr.querySelector('.board-name').value.trim();
+    const id   = parseInt(tr.querySelector('.board-id').value);
+    if (name && !isNaN(id)) boards[name] = id;
+  }
+  S.mappings.boards = boards;
+  const r = await saveMappings();
+  if (r && r.ok) toast('Boards saved');
+  else toast('Save failed: ' + (r?.error || 'Unknown'), 'err');
+}
+
+// ── Statuses ──────────────────────────────────────────────────────────────────
+function renderStatusesAccordion() {
+  const container = document.getElementById('statuses-accordion');
+  container.innerHTML = '';
+  const statusGroups = Object.entries(S.mappings)
+    .filter(([k]) => k.endsWith(' statuses'))
+    .sort(([a],[b]) => a.localeCompare(b));
+
+  if (statusGroups.length === 0) {
+    container.innerHTML = '<div class="empty-state">No status groups found.<br>They should be named "boardname statuses" in mappings.json.</div>';
+    return;
+  }
+
+  for (const [groupKey, statuses] of statusGroups) {
+    const boardName = groupKey.replace(' statuses', '');
+    const section = document.createElement('div');
+    section.style.cssText = 'margin-bottom:20px';
+    section.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <strong style="font-size:12px;color:var(--accent);text-transform:capitalize">${esc(boardName)}</strong>
+        <button class="btn btn-secondary btn-sm" onclick="addStatusRow('${esc(groupKey)}', this)">+ Add Status</button>
+      </div>
+      <div class="tbl-wrap">
+        <table data-group="${esc(groupKey)}">
+          <thead><tr><th>Status Name</th><th>CW Status ID</th><th></th></tr></thead>
+          <tbody>${
+            Object.entries(statuses).map(([sname, sid]) => `
+              <tr>
+                <td><input value="${esc(sname)}" class="st-name"></td>
+                <td><input value="${esc(String(sid))}" class="st-id" type="number" style="width:120px"></td>
+                <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">−</button></td>
+              </tr>`).join('')
+          }</tbody>
+        </table>
+      </div>
+    `;
+    container.appendChild(section);
+  }
+}
+
+function addStatusRow(groupKey, btn) {
+  const table = btn.closest('div').nextElementSibling.querySelector('table');
+  const tbody = table.querySelector('tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input value="" class="st-name" placeholder="Status Name"></td>
+    <td><input value="" class="st-id" type="number" placeholder="ID" style="width:120px"></td>
+    <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">−</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelector('input').focus();
+}
+
+async function saveStatuses() {
+  for (const table of document.querySelectorAll('#statuses-accordion table[data-group]')) {
+    const groupKey = table.dataset.group;
+    const statuses = {};
+    for (const tr of table.querySelectorAll('tbody tr')) {
+      const name = tr.querySelector('.st-name').value.trim();
+      const id   = parseInt(tr.querySelector('.st-id').value);
+      if (name && !isNaN(id)) statuses[name] = id;
+    }
+    S.mappings[groupKey] = statuses;
+  }
+  const r = await saveMappings();
+  if (r && r.ok) toast('Statuses saved');
+  else toast('Save failed: ' + (r?.error || 'Unknown'), 'err');
+}
+
+// ── Members ───────────────────────────────────────────────────────────────────
+function renderMembers() {
+  const tbody = document.getElementById('members-tbody');
+  tbody.innerHTML = '';
+  for (const [name, id] of Object.entries(S.mappings.members || {})) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input value="${esc(name)}" class="mem-name" data-orig="${esc(name)}"></td>
+      <td><input value="${esc(String(id))}" class="mem-id" type="number"></td>
+      <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function addMemberRow() {
+  const tbody = document.getElementById('members-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input value="" class="mem-name" placeholder="identifier" data-orig=""></td>
+    <td><input value="" class="mem-id" type="number" placeholder="CW Member ID"></td>
+    <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Remove</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelector('input').focus();
+}
+
+async function saveMembers() {
+  const members = {};
+  for (const tr of document.querySelectorAll('#members-tbody tr')) {
+    const name = tr.querySelector('.mem-name').value.trim();
+    const id   = parseInt(tr.querySelector('.mem-id').value);
+    if (name && !isNaN(id)) members[name] = id;
+  }
+  S.mappings.members = members;
+  const r = await saveMappings();
+  if (r && r.ok) toast('Members saved');
+  else toast('Save failed: ' + (r?.error || 'Unknown'), 'err');
+}
+
+// ── Environment ───────────────────────────────────────────────────────────────
+async function loadEnv() {
+  const data = await api('GET', '/api/env');
+  S.env = data;
+  document.getElementById('env-path').textContent = data.path || '(no .env found)';
+  const container = document.getElementById('env-rows');
+  container.innerHTML = '';
+  for (const [key, info] of Object.entries(data.vars || {})) {
+    const row = document.createElement('div');
+    row.className = 'env-row';
+    row.innerHTML = `
+      <div class="env-key">${esc(key)}</div>
+      <input class="env-input" type="text" data-key="${esc(key)}"
+             value="${esc(info.value || '')}"
+             placeholder="${info.set ? 'Click to update…' : 'Not set — enter value'}">
+      <div class="env-status ${info.set ? 'env-set':'env-unset'}">${info.set ? '✓ Set' : '✕ Unset'}</div>
+    `;
+    container.appendChild(row);
+  }
+}
+
+async function saveEnv() {
+  const vars = {};
+  for (const input of document.querySelectorAll('.env-input[data-key]')) {
+    vars[input.dataset.key] = input.value;
+  }
+  const r = await api('POST', '/api/env', { vars });
+  if (r.ok) { toast('Credentials saved'); loadEnv(); }
+  else toast('Save failed: ' + (r.errors || []).join(', '), 'err');
+}
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+function updateDryLabel() {
+  const isDry = document.getElementById('dry-run-override').checked;
+  document.getElementById('dry-label').textContent = isDry
+    ? 'Dry Run (no changes)' : 'Live Run (WILL modify tickets)';
+  document.getElementById('dry-label').style.color = isDry ? 'var(--muted)' : 'var(--yellow)';
+}
+document.getElementById('dry-run-override').addEventListener('change', updateDryLabel);
+
+async function startRun() {
+  if (running) return;
+  clearTerminal();
+  hideSummary();
+  setRunning(true);
+
+  const dry_run = document.getElementById('dry-run-override').checked;
+  const r = await api('POST', '/api/run/start', { dry_run });
+  if (r.error) {
+    toast(r.error, 'err');
+    setRunning(false);
+    return;
+  }
+  connectSSE();
+}
+
+async function stopRun() {
+  await api('POST', '/api/run/stop');
+  toast('Stop signal sent', 'warn');
+}
+
+function connectSSE() {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource('/api/run/stream');
+  evtSource.onmessage = e => {
+    const data = JSON.parse(e.data);
+    if (data.heartbeat) return;
+    if (data.line !== undefined) appendLog(data.line);
+    if (data.done) {
+      setRunning(false);
+      if (data.summary) showSummary(data.summary);
+      loadHistory();
+      evtSource.close();
+      evtSource = null;
+    }
+  };
+  evtSource.onerror = () => {
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    setRunning(false);
+  };
+}
+
+function setRunning(state) {
+  running = state;
+  const badge = document.getElementById('run-status-badge');
+  const btnRun  = document.getElementById('btn-run');
+  const btnStop = document.getElementById('btn-stop');
+  if (state) {
+    badge.textContent = 'Running…';
+    badge.className   = 'badge-running';
+    btnRun.disabled   = true;
+    btnStop.style.display = '';
+  } else {
+    badge.textContent = 'Idle';
+    badge.className   = 'badge-idle';
+    btnRun.disabled   = false;
+    btnStop.style.display = 'none';
+  }
+}
+
+function showSummary(s) {
+  document.getElementById('summary-stats').style.display = '';
+  document.getElementById('s-routed').textContent  = s.routed  ?? '—';
+  document.getElementById('s-skipped').textContent = s.skipped ?? '—';
+  document.getElementById('s-errors').textContent  = s.errors  ?? '—';
+  document.getElementById('s-mode').textContent    = s.dry_run ? 'DRY' : 'LIVE';
+}
+function hideSummary() { document.getElementById('summary-stats').style.display = 'none'; }
+
+function clearTerminal() {
+  document.getElementById('terminal').innerHTML = '';
+}
+
+const LOG_CLASS = line => {
+  if (line.startsWith('='))           return 'log-sep';
+  if (line.startsWith('  →') || line.startsWith('    →')) return 'log-agent';
+  if (line.includes('ERROR') || line.includes('FATAL')) return 'log-err';
+  if (line.includes('WARNING'))       return 'log-warn';
+  if (line.includes('[DRY RUN]'))     return 'log-dry';
+  if (line.startsWith('Ticket Router') || line.startsWith('---')) return 'log-head';
+  if (line.includes('Done.') || line.includes('Run complete')) return 'log-ok';
+  return 'log-info';
+};
+
+function appendLog(line) {
+  const term = document.getElementById('terminal');
+  const span = document.createElement('div');
+  span.className = 'log-line ' + LOG_CLASS(line);
+  span.textContent = line;
+  term.appendChild(span);
+  term.scrollTop = term.scrollHeight;
+}
+
+async function loadHistory() {
+  const history = await api('GET', '/api/run/history');
+  const el = document.getElementById('history-list');
+  if (!Array.isArray(history) || history.length === 0) {
+    el.innerHTML = '<div class="empty-state">No runs yet.</div>';
+    return;
+  }
+  el.innerHTML = history.map(h => `
+    <div class="history-item">
+      <span class="history-ts">${esc(h.timestamp)}</span>
+      <span class="history-badge ${h.dry_run ? 'hb-dry':'hb-live'}">${h.dry_run ? 'DRY' : 'LIVE'}</span>
+      <span class="history-stats">
+        <span class="hg">✓ ${h.routed} routed</span>
+        <span class="hy">⚠ ${h.skipped} skipped</span>
+        <span class="hr">✕ ${h.errors} errors</span>
+      </span>
+    </div>
+  `).join('');
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+async function refreshAll() {
+  await Promise.all([loadConfig(), loadMappings()]);
+  const activeTab = document.querySelector('.nav-item.active')?.dataset.tab;
+  if (activeTab === 'agents')  renderAgents();
+  if (activeTab === 'boards')  renderBoards();
+  if (activeTab === 'members') renderMembers();
+  toast('Refreshed');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadConfig(), loadMappings()]);
+  loadHistory();
+
+  // Set default report date range (last 90 days)
+  const today = new Date();
+  const ago90 = new Date(today); ago90.setDate(today.getDate() - 90);
+  document.getElementById('rp-date-to').value   = today.toISOString().split('T')[0];
+  document.getElementById('rp-date-from').value = ago90.toISOString().split('T')[0];
+
+  // Reconnect SSE if a run is in progress
+  const status = await api('GET', '/api/run/status');
+  if (status.running) {
+    setRunning(true);
+    connectSSE();
+  }
+}
+
+init();
+
+// =============================================================================
+// TOOL RUNNER SHARED HELPERS
+// =============================================================================
+
+// Which terminal element the current tool run writes to
+let currentToolTerminal = null;
+let toolRunning = false;
+
+function stopToolRun() { api('POST', '/api/run/stop'); toast('Stop signal sent', 'warn'); }
+
+function setToolRunning(state, runBtn, stopBtn) {
+  toolRunning = state;
+  if (runBtn)  runBtn.disabled   = state;
+  if (stopBtn) stopBtn.style.display = state ? '' : 'none';
+  // mirror the top-bar badge
+  const badge = document.getElementById('run-status-badge');
+  badge.textContent = state ? 'Running…' : 'Idle';
+  badge.className   = state ? 'badge-running' : 'badge-idle';
+}
+
+function appendToolLog(termEl, line) {
+  const span = document.createElement('div');
+  span.className = 'log-line ' + LOG_CLASS(line);
+  span.textContent = line;
+  termEl.appendChild(span);
+  termEl.scrollTop = termEl.scrollHeight;
+}
+
+function connectToolSSE(termEl, onDone) {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource('/api/run/stream');
+  evtSource.onmessage = e => {
+    const data = JSON.parse(e.data);
+    if (data.heartbeat) return;
+    if (data.line !== undefined) appendToolLog(termEl, data.line);
+    if (data.done) {
+      evtSource.close(); evtSource = null;
+      if (onDone) onDone(data.summary);
+    }
+  };
+  evtSource.onerror = () => { if (evtSource) { evtSource.close(); evtSource = null; } };
+}
+
+// =============================================================================
+// BULK EDITOR
+// =============================================================================
+
+document.getElementById('be-diagnostic').addEventListener('change', function() {
+  const lbl = document.getElementById('be-mode-label');
+  lbl.textContent = this.checked ? 'Diagnostic (no changes)' : 'Live Run (WILL modify tickets)';
+  lbl.style.color = this.checked ? 'var(--muted)' : 'var(--yellow)';
+});
+
+async function startBulkEdit() {
+  if (toolRunning) return;
+  const term    = document.getElementById('terminal-bulk');
+  const btnRun  = document.getElementById('be-btn-run');
+  const btnStop = document.getElementById('be-btn-stop');
+  term.innerHTML = '';
+  setToolRunning(true, btnRun, btnStop);
+
+  const summaryRaw = document.getElementById('be-summary-any').value;
+  const summaryAny = summaryRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+  const params = {
+    board_name:     document.getElementById('be-board').value.trim(),
+    source_status:  document.getElementById('be-source-status').value.trim(),
+    company_filter: document.getElementById('be-company-filter').value.trim(),
+    summary_any:    summaryAny,
+    diagnostic:     document.getElementById('be-diagnostic').checked,
+    do_assign:      document.getElementById('be-do-assign').checked,
+    assign_to:      document.getElementById('be-assign-to').value.trim(),
+    do_status:      document.getElementById('be-do-status').checked,
+    new_status:     document.getElementById('be-new-status').value.trim(),
+    do_type:        document.getElementById('be-do-type').checked,
+    new_type:       document.getElementById('be-new-type').value.trim(),
+    do_note:        document.getElementById('be-do-note').checked,
+    note_text:      document.getElementById('be-note-text').value.trim(),
+  };
+
+  const r = await api('POST', '/api/bulk-edit/start', params);
+  if (r.error) { toast(r.error, 'err'); setToolRunning(false, btnRun, btnStop); return; }
+
+  connectToolSSE(term, summary => {
+    setToolRunning(false, btnRun, btnStop);
+    if (summary) toast(`Done — ${summary.routed} processed, ${summary.errors} errors`,
+                       summary.errors ? 'warn' : 'ok');
+  });
+}
+
+// =============================================================================
+// TICKET SEARCH
+// =============================================================================
+
+async function startSearch() {
+  if (toolRunning) return;
+  const phrase = document.getElementById('sr-phrase').value.trim();
+  if (!phrase) { toast('Enter a search phrase', 'warn'); return; }
+
+  const term    = document.getElementById('terminal-search');
+  const btnRun  = document.getElementById('sr-btn-run');
+  const btnStop = document.getElementById('sr-btn-stop');
+  term.innerHTML = '';
+  document.getElementById('sr-results-tbody').innerHTML =
+    '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Searching…</td></tr>';
+  document.getElementById('sr-result-count').textContent = '—';
+  setToolRunning(true, btnRun, btnStop);
+
+  const params = {
+    phrase:         phrase,
+    company_filter: document.getElementById('sr-company').value.trim(),
+    days_back:      parseInt(document.getElementById('sr-days').value) || 0,
+    max_results:    parseInt(document.getElementById('sr-max').value)  || 200,
+    only_open:      document.getElementById('sr-only-open').checked,
+    search_audit:   document.getElementById('sr-audit').checked,
+  };
+
+  const r = await api('POST', '/api/search/start', params);
+  if (r.error) { toast(r.error, 'err'); setToolRunning(false, btnRun, btnStop); return; }
+
+  connectToolSSE(term, async summary => {
+    setToolRunning(false, btnRun, btnStop);
+    const results = await api('GET', '/api/search/results');
+    renderSearchResults(results);
+    toast(`Search complete — ${results.length} match${results.length !== 1 ? 'es' : ''}`);
+  });
+}
+
+async function renderSearchResults(results) {
+  const tbody = document.getElementById('sr-results-tbody');
+  const count = document.getElementById('sr-result-count');
+  count.textContent = results.length + ' matches';
+  count.style.background = results.length ? '#1a3a25' : 'var(--card2)';
+  count.style.color = results.length ? 'var(--green)' : 'var(--muted)';
+
+  if (!results.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">No matches found.</td></tr>';
+    return;
+  }
+
+  let cwBase = '';
+  try {
+    const meta = await api('GET', '/api/cw-manage-url');
+    cwBase = (meta && meta.base) ? meta.base : '';
+  } catch (_) {}
+
+  const ticketUrl = id => cwBase
+    ? `${cwBase}/v4_6_release/ConnectWise.aspx?locale=en_US&routeId=ServiceFV&noFormHost=true&recordType=ServiceTicket&recid=${id}`
+    : null;
+
+  const srcClass = s => s === 'note' ? 'src-note' : s === 'audit' ? 'src-audit' : 'src-summary';
+  tbody.innerHTML = results.map((r, i) => {
+    const url = ticketUrl(r.id);
+    const idCell = url
+      ? `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none" title="Open ticket #${esc(String(r.id))} in ConnectWise">#${esc(String(r.id))}</a>`
+      : `<span style="color:var(--accent)">#${esc(String(r.id))}</span>`;
+    return `
+    <tr>
+      <td style="color:var(--muted)">${i + 1}</td>
+      <td>${idCell}</td>
+      <td style="color:var(--muted)">${esc(r.company || '')}</td>
+      <td>${esc(r.summary || '')}</td>
+      <td><span class="src-badge ${srcClass(r.source)}">${esc(r.source)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// =============================================================================
+// REPORT
+// =============================================================================
+
+function _csv(id) {
+  return (document.getElementById(id).value || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function _num(id) {
+  const v = document.getElementById(id).value;
+  return v === '' ? null : Number(v);
+}
+
+async function startReport() {
+  if (toolRunning) return;
+  const term    = document.getElementById('terminal-report');
+  const btnRun  = document.getElementById('rp-btn-run');
+  const btnStop = document.getElementById('rp-btn-stop');
+  term.innerHTML = '';
+  document.getElementById('rp-results').style.display = 'none';
+  setToolRunning(true, btnRun, btnStop);
+
+  const params = {
+    date_from:               document.getElementById('rp-date-from').value,
+    date_to:                 document.getElementById('rp-date-to').value,
+    min_age_days:            _num('rp-min-age'),
+    max_age_days:            _num('rp-max-age'),
+    exclude_closed_month:    _num('rp-excl-month'),
+    exclude_closed_month_days: _num('rp-excl-month-days'),
+    company_include:         _csv('rp-company-inc'),
+    company_exclude:         _csv('rp-company-excl'),
+    assignee_include:        _csv('rp-assignee-inc'),
+    assignee_exclude:        _csv('rp-assignee-excl'),
+    assignee_suppress:       _csv('rp-assignee-suppress'),
+    board_include:           _csv('rp-board-inc'),
+    board_exclude:           _csv('rp-board-excl'),
+    status_include:          _csv('rp-status-inc'),
+    status_exclude:          _csv('rp-status-excl'),
+    priority_include:        _csv('rp-priority-inc'),
+    priority_exclude:        _csv('rp-priority-excl'),
+    summary_contains_any:    _csv('rp-summary-any'),
+    source_include:          _csv('rp-source-inc'),
+    team_include:            _csv('rp-team-inc'),
+    report_title:            document.getElementById('rp-title').value.trim(),
+    report_subtitle:         document.getElementById('rp-subtitle').value.trim(),
+    footer_left:             document.getElementById('rp-footer-l').value.trim(),
+    footer_right:            document.getElementById('rp-footer-r').value.trim(),
+  };
+
+  const r = await api('POST', '/api/report/run', params);
+  if (r.error) { toast(r.error, 'err'); setToolRunning(false, btnRun, btnStop); return; }
+
+  connectToolSSE(term, async summary => {
+    setToolRunning(false, btnRun, btnStop);
+    const data = await api('GET', '/api/report/data');
+    if (data && data.total !== undefined) {
+      renderReport(data);
+      toast(`Report ready — ${data.total} tickets`);
+    }
+  });
+}
+
+function downloadReportPDF() {
+  window.location.href = '/api/report/pdf';
+}
+
+function renderBarChart(containerId, dataObj, color) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const entries = Object.entries(dataObj);
+  if (!entries.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px">No data.</div>'; return; }
+  const max = Math.max(...entries.map(([,v]) => v));
+  el.innerHTML = entries.map(([label, val]) => `
+    <div class="bar-row">
+      <div class="bar-label" title="${esc(label)}">${esc(label)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${max ? Math.round(val/max*100) : 0}%;background:${color||'var(--accent)'}"></div></div>
+      <div class="bar-val">${val}</div>
+    </div>`).join('');
+}
+
+function renderList(containerId, dataObj) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = Object.entries(dataObj).map(([k, v]) =>
+    `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+       <span style="color:var(--muted)">${esc(k)}</span>
+       <span style="color:var(--text);font-weight:600">${v}</span>
+     </div>`).join('');
+}
+
+function renderReport(data) {
+  document.getElementById('rp-total').textContent  = data.total  ?? '—';
+  document.getElementById('rp-closed').textContent = data.closed ?? '—';
+  document.getElementById('rp-open').textContent   = data.open   ?? '—';
+  document.getElementById('rp-avg').textContent    = data.avg_close_days    != null ? data.avg_close_days    + 'd' : '—';
+  document.getElementById('rp-med').textContent    = data.median_close_days != null ? data.median_close_days + 'd' : '—';
+
+  renderBarChart('rp-assignee-chart', data.by_assignee || {}, 'var(--accent)');
+  renderBarChart('rp-type-chart',     data.by_type     || {}, 'var(--purple)');
+  renderBarChart('rp-company-chart',  data.by_company  || {}, 'var(--blue,#5b8dee)');
+  renderList('rp-board-list',    data.by_board    || {});
+  renderList('rp-status-list',   data.by_status   || {});
+  renderList('rp-priority-list', data.by_priority || {});
+  renderList('rp-source-list',   data.by_source   || {});
+
+  document.getElementById('rp-results').style.display = '';
+}
+</script>
+</body>
+</html>
