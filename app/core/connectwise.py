@@ -4,6 +4,14 @@ app/core/connectwise.py
 Low-level ConnectWise Manage API client.
 Handles session creation, authentication, and all HTTP operations
 so that services never need to touch requests directly.
+
+DEPRECATED — kept in place so existing imports in app/services/* continue to
+work without modification.  All new code should use:
+
+    from src.clients.connectwise import CWManageClient, CWConfig
+
+The canonical client in src/clients/connectwise.py merges this module with
+cw_agent_tools/connectwise_manage_client.py into a single, unified class.
 """
 
 from __future__ import annotations

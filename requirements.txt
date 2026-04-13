@@ -4,3 +4,4 @@ requests>=2.31
 python-dotenv>=1.0
 urllib3>=2.0
 matplotlib>=3.8
+sqlalchemy>=2.0

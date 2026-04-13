@@ -2017,11 +2017,8 @@ async function startReport() {
 
   connectToolSSE(term, async summary => {
     setToolRunning(false, btnRun, btnStop);
-    const data = await api('GET', '/api/report/data');
-    if (data && data.total !== undefined) {
-      renderReport(data);
-      toast(`Report ready — ${data.total} tickets`);
-    }
+    document.getElementById('rp-results').style.display = '';
+    toast('Report ready — click Download PDF');
   });
 }
 

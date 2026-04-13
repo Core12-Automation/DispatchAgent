@@ -1,9 +1,6 @@
 """
 app/services/report
 
-Ticket report service package:
-  - models   — dataclasses
-  - pipeline — data extraction, filtering, aggregation
-  - charts   — matplotlib chart generation
-  - builder  — HTML report assembly and PDF export
+Ticket report service package.
+Report generation is delegated to General_Ticket_Report_Final.generate_report().
 """
