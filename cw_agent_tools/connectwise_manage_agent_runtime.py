@@ -314,4 +314,5 @@ if __name__ == "__main__":
             "status": "New",
         },
     )
-    print(format_result(preview))
+    import logging as _logging
+    _logging.getLogger(__name__).debug("Tool preview result: %s", format_result(preview))

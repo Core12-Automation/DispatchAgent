@@ -1,0 +1,50 @@
+[Unit]
+Description=AI Dispatcher Portal (Flask + background ticket dispatcher)
+Documentation=https://github.com/dkarnani1/DispatchAgent
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dispatcher
+Group=dispatcher
+WorkingDirectory=/opt/ai-dispatcher
+
+# Environment variables loaded from the .env file.
+# Secrets (API keys, passwords) live here — never in the unit file.
+EnvironmentFile=/opt/ai-dispatcher/.env
+
+# Additional runtime variables that are deployment-specific, not secret.
+Environment=LOG_DIR=/var/log/ai-dispatcher
+Environment=FLASK_HOST=127.0.0.1
+Environment=FLASK_PORT=5000
+# Dry-run is controlled via portal_config.json; this env var is a hard
+# safety override — set to false only after verifying live dispatch works.
+Environment=DRY_RUN_OVERRIDE=true
+
+ExecStart=/opt/ai-dispatcher/venv/bin/python run.py
+
+# Restart policy — come back up automatically after crashes or OOM kills.
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65536
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# stdout/stderr go to the systemd journal; also captured by our file handler.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-dispatcher
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ai-dispatcher/data /var/log/ai-dispatcher
+
+[Install]
+WantedBy=multi-user.target

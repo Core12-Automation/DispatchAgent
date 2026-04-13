@@ -544,6 +544,207 @@
   .bar-fill  { height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s; }
   .bar-val   { min-width: 36px; color: var(--text); font-size: 11px; }
 
+  /* ── Dashboard: Decision Feed ── */
+  .decision-card {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    transition: background 0.1s;
+  }
+  .decision-card:hover { background: var(--card2); }
+  .decision-card:last-child { border-bottom: none; }
+  .decision-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .decision-ts {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .decision-ticket-link {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .decision-ticket-link:hover { text-decoration: underline; }
+  .decision-tech {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .conf-badge {
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--mono);
+  }
+  .conf-green  { background: #1a3a25; color: var(--green); }
+  .conf-yellow { background: #2d2000; color: var(--yellow); }
+  .conf-red    { background: #2d1c1c; color: var(--red); }
+  .status-badge {
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .sb-assigned { background: #1a3a25; color: var(--green); }
+  .sb-flagged  { background: #2d2000; color: var(--yellow); }
+  .sb-error    { background: #2d1c1c; color: var(--red); }
+  .sb-dry      { background: #2d1f5e; color: var(--purple); }
+  .decision-summary {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .decision-reason-wrap {
+    margin-top: 6px;
+    display: none;
+  }
+  .decision-reason {
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .decision-expand-btn {
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    background: none;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .decision-expand-btn:hover { color: var(--accent); }
+
+  /* ── Dashboard: Tech cards ── */
+  .tech-card {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .tech-card:last-child { margin-bottom: 0; }
+  .tech-card:hover { border-color: var(--accent); }
+  .tech-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tech-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .tech-info { flex: 1; min-width: 0; }
+  .tech-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .tech-presence { font-size: 11px; margin-top: 2px; }
+  .pres-available { color: var(--green); }
+  .pres-busy      { color: var(--red); }
+  .pres-away, .pres-berightback { color: var(--yellow); }
+  .pres-offline, .pres-unknown  { color: var(--muted); }
+  .tech-count {
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 32px;
+    text-align: right;
+    color: var(--text);
+  }
+  .workload-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .workload-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s;
+  }
+  .wl-low  { background: var(--green); }
+  .wl-med  { background: var(--yellow); }
+  .wl-high { background: var(--red); }
+  .tech-details {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    display: none;
+  }
+  .tech-detail-row { margin-bottom: 4px; line-height: 1.5; }
+  .tech-detail-val { color: var(--text); }
+
+  /* ── Dashboard layout ── */
+  .dash-two-col {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .dash-two-col { grid-template-columns: 1fr; } }
+  .dash-feed-inner {
+    max-height: 560px;
+    overflow-y: auto;
+  }
+  .dash-live-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .dash-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+  .dash-live-dot.inactive { background: var(--muted); }
+  .dash-live-msg {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* ── Search source badge ── */
   .src-badge {
     display: inline-block;
@@ -566,9 +767,17 @@
     <p>ConnectWise + Claude AI</p>
   </div>
   <nav>
-    <div class="nav-item active" data-tab="run" onclick="switchTab('run', this)">
+    <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4zM3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707zM2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10zm9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5zm.754-4.246a.389.389 0 0 0-.527-.02L7.547 9.31a.91.91 0 1 0 1.302 1.258l3.434-4.297a.389.389 0 0 0-.029-.518z"/><path fill-rule="evenodd" d="M0 10a8 8 0 1 1 15.547 2.661c-.442 1.253-1.845 1.602-2.932 1.25C11.309 13.488 9.475 13 8 13c-1.474 0-3.31.488-4.615.911-1.087.352-2.49.003-2.932-1.25A7.988 7.988 0 0 1 0 10zm8-7a7 7 0 0 0-6.603 9.329c.203.575.923.876 1.68.63C4.397 12.533 6.358 12 8 12s3.604.532 4.923.96c.757.245 1.477-.056 1.68-.631A7 7 0 0 0 8 3z"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" data-tab="run" onclick="switchTab('run', this)">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"/></svg>
       Run
+    </div>
+    <div class="nav-item" data-tab="dispatcher" onclick="switchTab('dispatcher', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
+      Dispatcher
     </div>
     <div class="nav-item" data-tab="config" onclick="switchTab('config', this)">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.474l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg>
@@ -612,15 +821,78 @@
 <!-- ── Main ── -->
 <div id="main">
   <div id="topbar">
-    <h2 id="topbar-title">Run</h2>
+    <h2 id="topbar-title">Dashboard</h2>
     <span id="run-status-badge" class="badge-idle">Idle</span>
     <button class="btn btn-secondary btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
 
   <div id="content">
 
+    <!-- ══ DASHBOARD TAB ══ -->
+    <div id="tab-dashboard" class="tab-panel active">
+
+      <!-- Section 3: Dispatch Metrics -->
+      <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
+        <div class="stat-card">
+          <div class="val stat-blue" id="dm-today">—</div>
+          <div class="lbl">Dispatched Today</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-blue" id="dm-week">—</div>
+          <div class="lbl">This Week</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-blue" id="dm-month">—</div>
+          <div class="lbl">This Month</div>
+        </div>
+        <div class="stat-card">
+          <div class="val" id="dm-avg-time" style="font-size:18px">—</div>
+          <div class="lbl">Avg Dispatch Time</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-yellow" id="dm-flagged">—</div>
+          <div class="lbl">Flagged Today</div>
+        </div>
+      </div>
+
+      <div class="dash-two-col">
+
+        <!-- Section 1: Live Decision Feed -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <h3 style="padding:14px 16px 12px;margin:0;border-radius:8px 8px 0 0;border-bottom:1px solid var(--border)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383-4.758 2.855L15 11.114v-5.73zm-.034 6.878L9.271 8.82 8 9.583 6.728 8.82l-5.694 3.44A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.739zM1 11.114l4.758-2.876L1 5.383v5.73z"/></svg>
+            Live Decision Feed
+            <span id="dash-feed-badge" class="badge" style="background:var(--card2);color:var(--muted)">—</span>
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadDashboardDecisions()">↻</button>
+          </h3>
+          <div class="dash-live-bar">
+            <div class="dash-live-dot inactive" id="dash-live-dot"></div>
+            <div class="dash-live-msg" id="dash-live-msg">Not connected</div>
+          </div>
+          <div class="dash-feed-inner" id="dash-feed">
+            <div class="empty-state">No dispatch decisions yet.</div>
+          </div>
+        </div>
+
+        <!-- Section 2: Tech Overview -->
+        <div>
+          <div class="card" style="padding:0;overflow:hidden">
+            <h3 style="padding:14px 16px 12px;margin:0;border-radius:8px 8px 0 0;border-bottom:1px solid var(--border)">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+              Tech Overview
+              <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px">(7-day workload)</span>
+            </h3>
+            <div style="padding:14px 14px 4px" id="dash-techs">
+              <div class="empty-state" style="padding:20px">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- ══ RUN TAB ══ -->
-    <div id="tab-run" class="tab-panel active">
+    <div id="tab-run" class="tab-panel">
       <div class="stats-grid" id="summary-stats" style="display:none">
         <div class="stat-card"><div class="val stat-green" id="s-routed">0</div><div class="lbl">Routed</div></div>
         <div class="stat-card"><div class="val stat-yellow" id="s-skipped">0</div><div class="lbl">Skipped</div></div>
@@ -657,6 +929,81 @@
       <div class="card" id="history-card">
         <h3>Run History</h3>
         <div id="history-list"><div class="empty-state">No runs yet.</div></div>
+      </div>
+    </div>
+
+    <!-- ══ DISPATCHER TAB ══ -->
+    <div id="tab-dispatcher" class="tab-panel">
+
+      <!-- Status cards -->
+      <div class="stats-grid" id="disp-stats-grid">
+        <div class="stat-card">
+          <div class="val" id="disp-status-val" style="font-size:20px">—</div>
+          <div class="lbl">Status</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-blue" id="disp-tickets-today">—</div>
+          <div class="lbl">Tickets Today</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-blue" id="disp-interval">—</div>
+          <div class="lbl">Interval (s)</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-blue" id="disp-uptime">—</div>
+          <div class="lbl">Uptime</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
+          Auto Dispatcher
+          <span id="disp-badge" class="badge" style="background:#1a3a25;color:var(--green)">Starting…</span>
+        </h3>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:13px">
+          <div>
+            <span style="color:var(--muted)">Last run: </span>
+            <span id="disp-last-run" style="font-family:var(--mono);font-size:12px">—</span>
+          </div>
+          <div>
+            <span style="color:var(--muted)">Next run: </span>
+            <span id="disp-next-run" style="font-family:var(--mono);font-size:12px">—</span>
+          </div>
+        </div>
+
+        <div id="disp-error-row" style="display:none;background:#2d1c1c;border:1px solid #da3633;border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:12px;color:var(--red)">
+          <strong>Last error:</strong> <span id="disp-last-error"></span>
+        </div>
+
+        <div class="run-controls">
+          <button id="disp-btn-toggle" class="btn btn-warning" onclick="dispatcherToggle()">⏸ Pause</button>
+          <button class="btn btn-primary" onclick="dispatcherRunOnce()">▶ Run Now</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadDispatcherStatus()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="card" id="disp-history-card">
+        <h3>Dispatch Run History <span style="font-size:11px;color:var(--muted);font-weight:400">(last 20)</span></h3>
+        <div class="tbl-wrap">
+          <table id="disp-history-table">
+            <thead>
+              <tr>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Trigger</th>
+                <th>Processed</th>
+                <th>Assigned</th>
+                <th>Flagged</th>
+                <th>Errors</th>
+              </tr>
+            </thead>
+            <tbody id="disp-history-tbody">
+              <tr><td colspan="7" class="empty-state">No runs yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1233,8 +1580,8 @@ let evtSource = null;
 let running   = false;
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
-const TITLES = { run:'Run', config:'Configuration', agents:'Agents',
-                 boards:'Boards & Statuses', members:'Members', env:'Environment',
+const TITLES = { dashboard:'Dashboard', run:'Run', dispatcher:'Dispatcher', config:'Configuration',
+                 agents:'Agents', boards:'Boards & Statuses', members:'Members', env:'Environment',
                  'bulk-edit':'Bulk Ticket Editor', search:'Ticket Search', report:'Report' };
 
 function switchTab(tab, el) {
@@ -1243,10 +1590,12 @@ function switchTab(tab, el) {
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
   document.getElementById('topbar-title').textContent = TITLES[tab] || tab;
-  if (tab === 'agents')  renderAgents();
-  if (tab === 'boards')  renderBoards();
-  if (tab === 'members') renderMembers();
-  if (tab === 'env')     loadEnv();
+  if (tab === 'agents')     renderAgents();
+  if (tab === 'boards')     renderBoards();
+  if (tab === 'members')    renderMembers();
+  if (tab === 'env')        loadEnv();
+  if (tab === 'dispatcher') { loadDispatcherStatus(); loadDispatcherHistory(); }
+  if (tab === 'dashboard')  { loadDashboard(); connectDashSSE(); }
 }
 
 // ── API helpers ───────────────────────────────────────────────────────────────
@@ -1770,9 +2119,10 @@ function esc(s) {
 async function refreshAll() {
   await Promise.all([loadConfig(), loadMappings()]);
   const activeTab = document.querySelector('.nav-item.active')?.dataset.tab;
-  if (activeTab === 'agents')  renderAgents();
-  if (activeTab === 'boards')  renderBoards();
-  if (activeTab === 'members') renderMembers();
+  if (activeTab === 'agents')    renderAgents();
+  if (activeTab === 'boards')    renderBoards();
+  if (activeTab === 'members')   renderMembers();
+  if (activeTab === 'dashboard') loadDashboard();
   toast('Refreshed');
 }
 
@@ -1793,6 +2143,11 @@ async function init() {
     setRunning(true);
     connectSSE();
   }
+
+  // Boot dashboard (it's the default tab)
+  loadDashboard();
+  connectDashSSE();
+  startDashPolling();
 }
 
 init();
@@ -2066,6 +2421,380 @@ function renderReport(data) {
   renderList('rp-source-list',   data.by_source   || {});
 
   document.getElementById('rp-results').style.display = '';
+}
+
+// =============================================================================
+// DASHBOARD
+// =============================================================================
+
+let _dashDecisions    = [];   // cached last 30 decisions
+let _dashPresence     = {};   // teams_user_id → presence object
+let _dashSSE          = null; // separate SSE connection for dashboard
+let _dashPollTimer    = null;
+let _cwBaseUrl        = '';   // cached CW base URL for ticket links
+
+async function loadDashboard() {
+  await Promise.all([
+    loadDashboardMetrics(),
+    loadDashboardDecisions(),
+    loadDashboardTechs(),
+  ]);
+}
+
+// ── Section 1: Live Decision Feed ─────────────────────────────────────────────
+
+async function loadDashboardDecisions() {
+  try {
+    const decisions = await api('GET', '/api/dispatcher/decisions');
+    if (Array.isArray(decisions)) {
+      _dashDecisions = decisions;
+      renderDecisionFeed(decisions);
+    }
+  } catch (_) {}
+}
+
+function renderDecisionFeed(decisions) {
+  const feed  = document.getElementById('dash-feed');
+  const badge = document.getElementById('dash-feed-badge');
+
+  if (!decisions || decisions.length === 0) {
+    feed.innerHTML = '<div class="empty-state" style="padding:30px">No dispatch decisions recorded yet.</div>';
+    badge.textContent = '0';
+    badge.style.cssText = 'background:var(--card2);color:var(--muted)';
+    return;
+  }
+
+  badge.textContent = decisions.length;
+  badge.style.cssText = 'background:#1a3a25;color:var(--green)';
+
+  const ticketUrl = id => _cwBaseUrl
+    ? `${_cwBaseUrl}/v4_6_release/ConnectWise.aspx?locale=en_US&routeId=ServiceFV&noFormHost=true&recordType=ServiceTicket&recid=${id}`
+    : null;
+
+  feed.innerHTML = decisions.map(d => {
+    const url = ticketUrl(d.ticket_id);
+    const ticketCell = url
+      ? `<a class="decision-ticket-link" href="${url}" target="_blank" rel="noopener">#${esc(String(d.ticket_id))}</a>`
+      : `<span class="decision-ticket-link" style="cursor:default">#${esc(String(d.ticket_id))}</span>`;
+
+    const conf = d.confidence != null ? parseFloat(d.confidence) : null;
+    let confClass = 'conf-yellow';
+    if (conf !== null) {
+      confClass = conf >= 0.8 ? 'conf-green' : conf >= 0.5 ? 'conf-yellow' : 'conf-red';
+    }
+    const confBadge = conf !== null
+      ? `<span class="conf-badge ${confClass}">${conf.toFixed(2)}</span>`
+      : '';
+
+    const statusBadge = d.assigned_to
+      ? (d.was_dry_run
+          ? `<span class="status-badge sb-dry">DRY</span>`
+          : `<span class="status-badge sb-assigned">Assigned</span>`)
+      : `<span class="status-badge sb-flagged">Flagged</span>`;
+
+    const techStr = d.assigned_to ? esc(d.assigned_to) : '<span style="color:var(--muted)">—</span>';
+
+    const reasonHtml = d.reason
+      ? `<button class="decision-expand-btn" onclick="toggleDecisionReason(this)" title="Toggle reasoning">▸ Reason</button>`
+      : '';
+
+    const reasonBlock = d.reason
+      ? `<div class="decision-reason-wrap"><div class="decision-reason">${esc(d.reason)}</div></div>`
+      : '';
+
+    const ts = d.created_at ? d.created_at.replace('T', ' ').replace(/\.\d+.*$/, '') : '—';
+    const summary = d.ticket_summary ? esc(d.ticket_summary) : '<em style="color:var(--muted)">No summary</em>';
+
+    return `
+    <div class="decision-card">
+      <div class="decision-meta">
+        <span class="decision-ts">${esc(ts)}</span>
+        ${ticketCell}
+        <span class="decision-tech">${techStr}</span>
+        ${confBadge}
+        ${statusBadge}
+        ${reasonHtml}
+      </div>
+      <div class="decision-summary">${summary}</div>
+      ${reasonBlock}
+    </div>`;
+  }).join('');
+}
+
+function toggleDecisionReason(btn) {
+  const card = btn.closest('.decision-card');
+  const wrap = card.querySelector('.decision-reason-wrap');
+  if (!wrap) return;
+  const open = wrap.style.display !== 'none' && wrap.style.display !== '';
+  wrap.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? '▸ Reason' : '▾ Reason';
+}
+
+// ── SSE: live dispatcher activity ─────────────────────────────────────────────
+
+function connectDashSSE() {
+  if (_dashSSE) { _dashSSE.close(); _dashSSE = null; }
+
+  const dot = document.getElementById('dash-live-dot');
+  const msg = document.getElementById('dash-live-msg');
+
+  _dashSSE = new EventSource('/api/run/stream');
+
+  _dashSSE.onopen = () => {
+    if (dot) { dot.classList.remove('inactive'); }
+    if (msg)   msg.textContent = 'Connected — listening for dispatcher activity…';
+  };
+
+  _dashSSE.onmessage = e => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.heartbeat) return;
+      if (data.line) {
+        const line = data.line;
+        // Only surface dispatcher lines to the live bar
+        if (line.includes('[Dispatcher]')) {
+          if (msg) msg.textContent = line.replace('[Dispatcher] ', '');
+          // Refresh decisions after a cycle completes
+          if (line.includes('Cycle complete') || line.includes('decisions_made')) {
+            setTimeout(loadDashboardDecisions, 500);
+          }
+        }
+      }
+    } catch (_) {}
+  };
+
+  _dashSSE.onerror = () => {
+    if (dot) dot.classList.add('inactive');
+    if (msg) msg.textContent = 'Disconnected — will reconnect on next poll';
+    // SSE errors are non-fatal; polling still refreshes the feed
+  };
+}
+
+// ── Section 2: Tech Overview ──────────────────────────────────────────────────
+
+async function loadDashboardTechs() {
+  try {
+    const [members, presence, metrics] = await Promise.all([
+      api('GET', '/api/members'),
+      fetch('/api/members/presence').then(r => r.json()).catch(() => []),
+      api('GET', '/api/dispatcher/metrics').catch(() => ({})),
+    ]);
+
+    // Build presence map keyed by tech name (best effort)
+    const presenceByName = {};
+    if (Array.isArray(presence)) {
+      for (const p of presence) {
+        presenceByName[p.name] = p;
+      }
+    }
+
+    const workload = (metrics && metrics.assignments_by_tech) ? metrics.assignments_by_tech : {};
+
+    if (!Array.isArray(members) || members.length === 0) {
+      document.getElementById('dash-techs').innerHTML =
+        '<div class="empty-state" style="padding:20px">No technicians found.</div>';
+      return;
+    }
+
+    // Sort by workload descending
+    const sorted = [...members].sort((a, b) => {
+      const wa = workload[a.technician] || 0;
+      const wb = workload[b.technician] || 0;
+      return wb - wa;
+    });
+
+    const maxWork = Math.max(1, ...Object.values(workload));
+
+    document.getElementById('dash-techs').innerHTML = sorted.map(m => {
+      const initials = (m.name || m.technician || '?')
+        .split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+
+      const pres = presenceByName[m.name] || null;
+      let presHtml = '<span class="tech-presence pres-offline">● Offline</span>';
+      if (pres) {
+        const av = (pres.availability || 'Unknown').toLowerCase();
+        if (av === 'available') {
+          presHtml = '<span class="tech-presence pres-available">● Online</span>';
+        } else if (av === 'busy' || av === 'donotdisturb') {
+          presHtml = `<span class="tech-presence pres-busy">● ${esc(pres.availability)}</span>`;
+        } else if (av === 'away' || av === 'berightback') {
+          presHtml = `<span class="tech-presence pres-away">● ${esc(pres.availability)}</span>`;
+        }
+      }
+
+      const count = workload[m.technician] || 0;
+      const pct   = maxWork > 0 ? Math.round(count / maxWork * 100) : 0;
+      const wlClass = pct >= 75 ? 'wl-high' : pct >= 40 ? 'wl-med' : 'wl-low';
+
+      const skillsStr      = (m.skills      || []).join(', ') || '—';
+      const specialtiesStr = (m.specialties || []).join(', ') || '—';
+
+      return `
+      <div class="tech-card" onclick="toggleTechCard(this)">
+        <div class="tech-card-header">
+          <div class="tech-avatar">${esc(initials)}</div>
+          <div class="tech-info">
+            <div class="tech-name">${esc(m.name || m.technician)}</div>
+            ${presHtml}
+          </div>
+          <div class="tech-count" style="color:${pct>=75?'var(--red)':pct>=40?'var(--yellow)':'var(--text)'}">${count}</div>
+        </div>
+        <div class="workload-bar">
+          <div class="workload-fill ${wlClass}" style="width:${pct}%"></div>
+        </div>
+        <div class="tech-details">
+          <div class="tech-detail-row">Skills: <span class="tech-detail-val">${esc(skillsStr)}</span></div>
+          <div class="tech-detail-row">Specialties: <span class="tech-detail-val">${esc(specialtiesStr)}</span></div>
+          ${m.avg_resolution_minutes != null
+            ? `<div class="tech-detail-row">Avg resolution: <span class="tech-detail-val">${Math.round(m.avg_resolution_minutes)} min</span></div>` : ''}
+          ${m.total_tickets_handled
+            ? `<div class="tech-detail-row">Total handled: <span class="tech-detail-val">${m.total_tickets_handled}</span></div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('dash-techs').innerHTML =
+      `<div class="empty-state" style="padding:20px">Error loading techs.</div>`;
+  }
+}
+
+function toggleTechCard(card) {
+  const details = card.querySelector('.tech-details');
+  if (details) details.style.display = details.style.display === 'block' ? 'none' : 'block';
+}
+
+// ── Section 3: Metrics ────────────────────────────────────────────────────────
+
+async function loadDashboardMetrics() {
+  try {
+    const m = await api('GET', '/api/dispatcher/metrics');
+    if (m.error) return;
+    document.getElementById('dm-today').textContent   = m.today   ?? '—';
+    document.getElementById('dm-week').textContent    = m.week    ?? '—';
+    document.getElementById('dm-month').textContent   = m.month   ?? '—';
+    document.getElementById('dm-flagged').textContent = m.flagged_today ?? '—';
+    if (m.avg_dispatch_secs != null) {
+      const secs = m.avg_dispatch_secs;
+      document.getElementById('dm-avg-time').textContent =
+        secs >= 60 ? `${Math.round(secs/60)}m` : `${secs}s`;
+    } else {
+      document.getElementById('dm-avg-time').textContent = '—';
+    }
+  } catch (_) {}
+}
+
+// ── Polling (15s) ─────────────────────────────────────────────────────────────
+
+function startDashPolling() {
+  if (_dashPollTimer) clearInterval(_dashPollTimer);
+  _dashPollTimer = setInterval(async () => {
+    const activeTab = document.querySelector('.nav-item.active')?.dataset.tab;
+    if (activeTab !== 'dashboard') return;
+    await Promise.all([loadDashboardMetrics(), loadDashboardTechs()]);
+  }, 15000);
+}
+
+// Pre-fetch CW base URL once for ticket links
+api('GET', '/api/cw-manage-url').then(d => { if (d && d.base) _cwBaseUrl = d.base; }).catch(() => {});
+
+// ── Dispatcher ────────────────────────────────────────────────────────────────
+
+let _dispatcherPaused = false;
+
+async function loadDispatcherStatus() {
+  const s = await api('GET', '/api/dispatcher/status');
+  if (s.error) { return; }
+
+  _dispatcherPaused = s.paused;
+
+  // Badge
+  const badge = document.getElementById('disp-badge');
+  const statusVal = document.getElementById('disp-status-val');
+  const toggleBtn = document.getElementById('disp-btn-toggle');
+
+  if (!s.running) {
+    badge.textContent = 'Stopped';
+    badge.style.cssText = 'background:#2d1c1c;color:var(--red)';
+    statusVal.textContent = 'Stopped';
+    statusVal.style.color = 'var(--red)';
+  } else if (s.paused) {
+    const reason = s.pause_reason === 'cw_error' ? 'CW Error' :
+                   s.pause_reason === 'rate_limit' ? 'Rate Limit' : 'Paused';
+    badge.textContent = reason;
+    badge.style.cssText = 'background:#2d2000;color:var(--yellow)';
+    statusVal.textContent = reason;
+    statusVal.style.color = 'var(--yellow)';
+    toggleBtn.textContent = '▶ Resume';
+    toggleBtn.className = 'btn btn-success';
+  } else {
+    badge.textContent = 'Running';
+    badge.style.cssText = 'background:#1a3a25;color:var(--green)';
+    statusVal.textContent = 'Running';
+    statusVal.style.color = 'var(--green)';
+    toggleBtn.textContent = '⏸ Pause';
+    toggleBtn.className = 'btn btn-warning';
+  }
+
+  // Info fields
+  document.getElementById('disp-tickets-today').textContent = s.tickets_today ?? '—';
+  document.getElementById('disp-interval').textContent      = s.interval_secs  ?? '—';
+  document.getElementById('disp-last-run').textContent      = s.last_run        || '—';
+  document.getElementById('disp-next-run').textContent      = s.next_run        || '—';
+
+  if (s.uptime_secs != null) {
+    const h = Math.floor(s.uptime_secs / 3600);
+    const m = Math.floor((s.uptime_secs % 3600) / 60);
+    document.getElementById('disp-uptime').textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  } else {
+    document.getElementById('disp-uptime').textContent = '—';
+  }
+
+  // Error row
+  const errRow = document.getElementById('disp-error-row');
+  if (s.last_error) {
+    document.getElementById('disp-last-error').textContent = s.last_error;
+    errRow.style.display = '';
+  } else {
+    errRow.style.display = 'none';
+  }
+}
+
+async function loadDispatcherHistory() {
+  const rows = await api('GET', '/api/dispatcher/history');
+  const tbody = document.getElementById('disp-history-tbody');
+  if (!Array.isArray(rows) || rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No runs yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const triggerBadge = r.trigger === 'scheduled'
+      ? `<span style="background:#1f3060;color:#79c0ff;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">auto</span>`
+      : `<span style="background:#1a3a25;color:var(--green);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">manual</span>`;
+    const dur = r.duration_secs != null ? `${r.duration_secs}s` : '—';
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:12px">${esc(r.started_at || '—')}</td>
+      <td>${esc(dur)}</td>
+      <td>${triggerBadge}</td>
+      <td style="color:var(--text)">${r.tickets_processed}</td>
+      <td style="color:var(--green)">${r.tickets_assigned}</td>
+      <td style="color:var(--yellow)">${r.tickets_flagged}</td>
+      <td style="color:${r.errors > 0 ? 'var(--red)' : 'var(--muted)'}">${r.errors}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function dispatcherToggle() {
+  const r = await api('POST', '/api/dispatcher/toggle');
+  if (r.error) { toast(r.error, 'err'); return; }
+  toast(r.paused ? 'Dispatcher paused' : 'Dispatcher resumed', r.paused ? 'warn' : 'ok');
+  loadDispatcherStatus();
+}
+
+async function dispatcherRunOnce() {
+  const r = await api('POST', '/api/dispatcher/run-once');
+  if (r.error) { toast(r.error, 'err'); return; }
+  toast('Dispatch cycle triggered');
+  setTimeout(() => { loadDispatcherStatus(); loadDispatcherHistory(); }, 2000);
 }
 </script>
 </body>

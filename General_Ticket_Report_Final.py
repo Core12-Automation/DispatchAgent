@@ -31,15 +31,34 @@ import shutil
 import subprocess
 
 # =============================================================================
-# PATH CONFIG (hardcode here, nowhere else)
+# PATH CONFIG — driven by environment variables, no hardcoded paths
 # =============================================================================
-load_dotenv(r"C:\APIscripts\.env")
-REPORTS_DIR = Path(r"C:\APIscripts\Reporting Scripts")
-RAW_DATA_DIR = REPORTS_DIR / "Reporting Data"
-REPORT_OUTPUT_DIR = REPORTS_DIR / "Ticket Reports"
-MAPPINGS_JSON_PATH = Path(r"C:\APIscripts\mappings.json")
-CW_COMPANIES_JSON_PATH = Path(r"C:\APIscripts\cw_companies.json")
-ASSETS_DIR = REPORTS_DIR / "Reporting Data" / "_report_assets"
+# Override any of these in .env or the shell environment.
+# Defaults are relative to the project root so the script works when deployed
+# to /opt/ai-dispatcher without modification.
+from dotenv import find_dotenv
+load_dotenv(find_dotenv())
+
+_BASE_DIR = Path(__file__).resolve().parent
+
+REPORTS_DIR = Path(
+    os.getenv("REPORTS_DIR", str(_BASE_DIR / "reports"))
+)
+RAW_DATA_DIR = Path(
+    os.getenv("RAW_DATA_DIR", str(REPORTS_DIR / "Reporting Data"))
+)
+REPORT_OUTPUT_DIR = Path(
+    os.getenv("REPORT_OUTPUT_DIR", str(REPORTS_DIR / "Ticket Reports"))
+)
+MAPPINGS_JSON_PATH = Path(
+    os.getenv("MAPPINGS_JSON_PATH", str(_BASE_DIR / "data" / "mappings.json"))
+)
+CW_COMPANIES_JSON_PATH = Path(
+    os.getenv("CW_COMPANIES_JSON_PATH", str(_BASE_DIR / "data" / "cw_companies.json"))
+)
+ASSETS_DIR = Path(
+    os.getenv("ASSETS_DIR", str(RAW_DATA_DIR / "_report_assets"))
+)
 
 # --- Auto JSON/report naming (recommended) ---
 AUTO_USE_SAME_DAY_JSON = False
@@ -54,14 +73,20 @@ REPORT_FILENAME_SUFFIX = "Report"
 REPORT_FILENAME_INCLUDE_YEAR = False   # retained for compatibility; filename date tokens come from selected ticket-created date range
 
 # Manual fallback path (used only if AUTO_USE_SAME_DAY_JSON = False)
-RAW_JSON_PATH = REPORTS_DIR / "Reporting Data" / "blur_tickets_all.json"
+RAW_JSON_PATH = Path(
+    os.getenv("RAW_JSON_PATH", str(REPORTS_DIR / "Reporting Data" / "blur_tickets_all.json"))
+)
 
 # Output path mode toggle
 AUTO_OUTPUT_NAMING_ENABLED = False  # True => auto-build output filename/path, False => use manual OUTPUT_*_PATH below exactly as written
 
 # Manual output paths (used when AUTO_OUTPUT_NAMING_ENABLED = False)
-OUTPUT_PDF_PATH = REPORTS_DIR / "Misc Reports" /"BLUR_past_3_months_no_alerts.pdf"
-OUTPUT_HTML_PATH = REPORTS_DIR / "Misc Reports" /"BLUR_past_3_months_no_alerts.html"
+OUTPUT_PDF_PATH = Path(
+    os.getenv("OUTPUT_PDF_PATH", str(REPORTS_DIR / "Misc Reports" / "BLUR_past_3_months_no_alerts.pdf"))
+)
+OUTPUT_HTML_PATH = Path(
+    os.getenv("OUTPUT_HTML_PATH", str(REPORTS_DIR / "Misc Reports" / "BLUR_past_3_months_no_alerts.html"))
+)
 
 # Email
 EMAIL_RECIPIENTS: List[str] = [
@@ -86,7 +111,9 @@ REPORT_SUBTITLE = "Close-touch merge correction is enabled for close-time report
 REPORT_FOOTER_LEFT = "Core12"
 REPORT_FOOTER_RIGHT = "Generated Using Core12's Internal API"
 
-REPORT_LOGO_PATH = REPORTS_DIR / "Core12 Logo.png"
+REPORT_LOGO_PATH = Path(
+    os.getenv("REPORT_LOGO_PATH", str(REPORTS_DIR / "Core12 Logo.png"))
+)
 
 # Section headings
 H_KPIS = "Statistics Overview"

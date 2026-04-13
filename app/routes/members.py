@@ -6,9 +6,10 @@ Blueprint: /api/members
 Member management backed by SQLite (technicians table), not portal_config.json.
 
 Endpoints:
-    GET  /api/members          — list all technicians
-    GET  /api/members/<ident>  — single profile (by CW login identifier or DB id)
-    PUT  /api/members/<ident>  — partial update (skills, specialties, notes, …)
+    GET  /api/members           — list all technicians
+    GET  /api/members/presence  — batch Teams presence for all techs with teams_user_id
+    GET  /api/members/<ident>   — single profile (by CW login identifier or DB id)
+    PUT  /api/members/<ident>   — partial update (skills, specialties, notes, …)
 
 The mappings board/status editor (/api/mappings) is unchanged; only member
 (technician) profile data is served from the DB.
@@ -47,6 +48,53 @@ def list_members():
         return jsonify(profiles)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+# ── GET /api/members/presence ─────────────────────────────────────────────────
+
+@bp.route("/api/members/presence", methods=["GET"])
+def members_presence():
+    """
+    Batch-fetch Teams presence for all technicians that have a teams_user_id set.
+
+    Returns a list of:
+        {teams_user_id, name, availability, activity}
+
+    availability is one of: Available, Busy, Away, BeRightBack,
+                            DoNotDisturb, Offline, PresenceUnknown
+    Returns [] if Teams credentials are not configured.
+    """
+    try:
+        from src.clients.database import SessionLocal, Technician
+        with SessionLocal() as session:
+            techs = (
+                session.query(Technician)
+                .filter(Technician.teams_user_id.isnot(None))
+                .all()
+            )
+            user_ids  = [t.teams_user_id for t in techs if t.teams_user_id]
+            tech_map  = {t.teams_user_id: t.name for t in techs if t.teams_user_id}
+
+        if not user_ids:
+            return jsonify([])
+
+        from src.clients.teams import TeamsClient
+        client = TeamsClient()
+        presence_list = client.get_users_presence(user_ids)
+
+        result = [
+            {
+                "teams_user_id": p.get("id"),
+                "name":          tech_map.get(p.get("id"), p.get("id", "")),
+                "availability":  p.get("availability", "PresenceUnknown"),
+                "activity":      p.get("activity", "Unknown"),
+            }
+            for p in presence_list
+        ]
+        return jsonify(result)
+    except Exception as exc:
+        # Missing credentials or Graph API error — return empty list gracefully
+        return jsonify([])
 
 
 # ── GET /api/members/<ident> ──────────────────────────────────────────────────

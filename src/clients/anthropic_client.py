@@ -72,6 +72,12 @@ class AnthropicClient:
 
         Raises ValueError if the response contains no text content.
         """
+        try:
+            from app.core.rate_limiter import get_claude_limiter
+            get_claude_limiter().record_call()
+        except Exception:
+            pass  # rate limiter is best-effort; never block a real API call
+
         response = self._client.messages.create(
             model=model or self.default_model,
             max_tokens=max_tokens or self.default_max_tokens,
@@ -116,6 +122,12 @@ class AnthropicClient:
         loop_messages = list(messages)
 
         for _ in range(max_iterations):
+            try:
+                from app.core.rate_limiter import get_claude_limiter
+                get_claude_limiter().record_call()
+            except Exception:
+                pass  # best-effort
+
             response = self._client.messages.create(
                 model=model or self.default_model,
                 max_tokens=max_tokens or self.default_max_tokens,

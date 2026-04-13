@@ -224,17 +224,28 @@ class CWManageClient:
                 response=resp,
             )
 
+    def _record_cw_call(self) -> None:
+        """Record one CW API call against the rate limiter (best-effort)."""
+        try:
+            from app.core.rate_limiter import get_cw_limiter
+            get_cw_limiter().record_call()
+        except Exception:
+            pass
+
     def get(self, path: str, **kwargs: Any) -> Any:
+        self._record_cw_call()
         return self._json(self.request("GET", path, **kwargs))
 
     def post(self, path: str, **kwargs: Any) -> Any:
         if self.dry_run:
             return None
+        self._record_cw_call()
         return self._json(self.request("POST", path, **kwargs))
 
     def patch(self, path: str, ops: List[Dict[str, Any]]) -> Any:
         if self.dry_run:
             return None
+        self._record_cw_call()
         return self._json(
             self.request("PATCH", path, json=ops)
         )
@@ -242,6 +253,7 @@ class CWManageClient:
     def delete(self, path: str, **kwargs: Any) -> Any:
         if self.dry_run:
             return None
+        self._record_cw_call()
         return self._json(self.request("DELETE", path, **kwargs))
 
     # ── Absolute URL (follows _info hrefs) ───────────────────────────────────

@@ -20,6 +20,7 @@ Safe to re-run:
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -27,10 +28,18 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# ── Standalone logging (simple console output — this is a CLI script) ─────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)-8s %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger(__name__)
+
 
 def _load_json(path: Path, label: str) -> dict:
     if not path.exists():
-        print(f"  [WARN] {label} not found at {path} -- skipping")
+        log.warning("%s not found at %s — skipping", label, path)
         return {}
     with open(path, encoding="utf-8") as f:
         return json.load(f)
@@ -83,7 +92,8 @@ def migrate_technicians(mappings: dict, session) -> tuple[int, int]:
             action = "UPDATE"
             updated += 1
 
-        print(f"  [{action}] {ident!r:20s}  cw_member_id={cw_member_id}  name={display_name!r}")
+        log.info("  [%s] %-20s  cw_member_id=%-6s  name=%r",
+                 action, ident, cw_member_id, display_name)
 
     session.commit()
     return created, updated
@@ -106,7 +116,6 @@ def seed_training_examples(training: dict, session) -> tuple[int, int]:
       - reason     : "Historical routing example (training data)"
       - confidence : 0.9
       - was_dry_run : False  (these were real decisions)
-      - notes field in reason marks them as training seeds
     """
     from src.clients.database import DispatchDecision, Technician
 
@@ -121,13 +130,13 @@ def seed_training_examples(training: dict, session) -> tuple[int, int]:
         .count()
     )
     if existing_count >= len(examples):
-        print(f"  [SKIP] {existing_count} training examples already in DB -- skipping re-seed")
+        log.info("  [SKIP] %d training examples already in DB — skipping re-seed",
+                 existing_count)
         return 0, existing_count
 
     # Build tech name -> DB id lookup
     tech_rows = session.query(Technician).all()
     tech_id_map: dict[str, int] = {t.name: t.id for t in tech_rows}
-    # Also index by identifier (lower-cased name-prefix heuristic handled below)
 
     inserted = 0
     skipped_existing = existing_count
@@ -139,7 +148,6 @@ def seed_training_examples(training: dict, session) -> tuple[int, int]:
         summary: str = ex.get("summary") or ""
         company: str = ex.get("company") or ""
 
-        # Check if this synthetic ID already exists
         exists = (
             session.query(DispatchDecision)
             .filter_by(ticket_id=synthetic_id)
@@ -149,10 +157,7 @@ def seed_training_examples(training: dict, session) -> tuple[int, int]:
             skipped_existing += 1
             continue
 
-        # Build a rich summary for keyword search
         full_summary = " | ".join(filter(None, [ticket_type, summary, company]))
-
-        # Try to find the tech's DB id
         tech_db_id: int | None = tech_id_map.get(assigned_to)
 
         decision = DispatchDecision(
@@ -160,7 +165,10 @@ def seed_training_examples(training: dict, session) -> tuple[int, int]:
             ticket_summary=full_summary[:500],
             assigned_tech_id=tech_db_id,
             assigned_tech_identifier=assigned_to,
-            reason=f"Historical routing example (training seed). Type: {ticket_type}. Company: {company}.",
+            reason=(
+                f"Historical routing example (training seed). "
+                f"Type: {ticket_type}. Company: {company}."
+            ),
             confidence=0.9,
             was_dry_run=False,
         )
@@ -170,7 +178,7 @@ def seed_training_examples(training: dict, session) -> tuple[int, int]:
 
         if inserted % 100 == 0:
             session.flush()
-            print(f"    ... {inserted} examples inserted so far")
+            log.info("    ... %d examples inserted so far", inserted)
 
     session.commit()
     return inserted, skipped_existing
@@ -179,9 +187,9 @@ def seed_training_examples(training: dict, session) -> tuple[int, int]:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    print("=" * 60)
-    print("DispatchAgent -- Database Migration")
-    print("=" * 60)
+    log.info("=" * 60)
+    log.info("DispatchAgent -- Database Migration")
+    log.info("=" * 60)
 
     # ── Load config to find mappings path ─────────────────────────────────────
     config_path = PROJECT_ROOT / "data" / "portal_config.json"
@@ -194,43 +202,46 @@ def main() -> None:
 
     # ── Load source files ─────────────────────────────────────────────────────
     mappings = _load_json(mappings_path, "mappings.json")
-    training = _load_json(PROJECT_ROOT / "data" / "routing_training.json", "routing_training.json")
+    training = _load_json(
+        PROJECT_ROOT / "data" / "routing_training.json",
+        "routing_training.json",
+    )
 
     if not mappings:
-        print("\nNo mappings data available. Nothing to migrate.")
-        print("Copy data/mappings.json from the original project first.")
+        log.error("No mappings data available — nothing to migrate.")
+        log.error("Copy data/mappings.json from the original project first.")
         sys.exit(0)
 
     # ── Init DB ───────────────────────────────────────────────────────────────
     from src.clients.database import SessionLocal, init_db
 
-    print("\nInitialising database tables ...")
+    log.info("Initialising database tables ...")
     init_db()
-    print("  [OK] Tables ready")
+    log.info("  [OK] Tables ready")
 
     # ── Migrate technicians ───────────────────────────────────────────────────
-    print("\n[1/2] Migrating technicians ...")
+    log.info("[1/2] Migrating technicians ...")
     with SessionLocal() as session:
         created, updated = migrate_technicians(mappings, session)
 
-    print(f"\n  Technicians created : {created}")
-    print(f"  Technicians updated : {updated}")
+    log.info("  Technicians created : %d", created)
+    log.info("  Technicians updated : %d", updated)
 
     # ── Seed training examples ────────────────────────────────────────────────
     meta = training.get("_meta") or {}
     example_count = meta.get("examples", len(training.get("examples") or []))
-    print(f"\n[2/2] Seeding routing training examples ({example_count} total) ...")
+    log.info("[2/2] Seeding routing training examples (%d total) ...", example_count)
     with SessionLocal() as session:
         inserted, skipped = seed_training_examples(training, session)
 
-    print(f"\n  Training examples inserted : {inserted}")
-    print(f"  Training examples skipped  : {skipped} (already present)")
+    log.info("  Training examples inserted : %d", inserted)
+    log.info("  Training examples skipped  : %d (already present)", skipped)
 
     # ── Summary ───────────────────────────────────────────────────────────────
-    print("\n" + "-" * 60)
-    print("Migration complete.")
-    print(f"  Database : {PROJECT_ROOT / 'data' / 'dispatcher.db'}")
-    print("=" * 60)
+    log.info("-" * 60)
+    log.info("Migration complete.")
+    log.info("  Database : %s", PROJECT_ROOT / "data" / "dispatcher.db")
+    log.info("=" * 60)
 
 
 if __name__ == "__main__":
