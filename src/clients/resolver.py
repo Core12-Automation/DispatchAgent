@@ -216,19 +216,40 @@ class MappingResolver:
 
     def resolve_type_id(self, board_name_or_id: Any, type_value: Any) -> int:
         """
-        Resolve a ticket type name within the correct board-scoped section.
-        e.g. resolve_type_id("Support", "Network") → 1143
+        Resolve a ticket type name to a ConnectWise integer ID.
+
+        Resolution order:
+          1. Numeric pass-through (already an ID).
+          2. DB support_types table (primary source).
+          3. mappings.json board-scoped types section (legacy fallback).
+          4. mappings.json "support types" global section (legacy fallback).
         """
         nid = parse_maybe_int(type_value)
         if nid is not None:
             return nid
+
+        # ── DB lookup (primary) ───────────────────────────────────────────────
+        from src.clients.database import lookup_support_type
+        db_id = lookup_support_type(str(type_value))
+        if db_id is not None:
+            return db_id
+
+        # ── mappings.json fallback ────────────────────────────────────────────
         board_name = str(board_name_or_id or "").strip()
         if parse_maybe_int(board_name_or_id) is not None:
             board_name = (
                 self.reverse_lookup_name("boards", board_name_or_id) or board_name
             )
-        section = f"{normalize_key(board_name)} types"
-        return self.resolve_from_section(section, type_value, "type")
+        for section in (f"{normalize_key(board_name)} types", "support types"):
+            mapping = self.mappings.get(normalize_key(section)) or {}
+            resolved = parse_maybe_int(mapping.get(normalize_key(type_value)))
+            if resolved is not None:
+                return resolved
+
+        raise RuntimeError(
+            f"Could not resolve type {type_value!r}. "
+            f"Add it via POST /api/types or check data/mappings.json."
+        )
 
     def resolve_company_id(self, value: Any) -> int:
         """

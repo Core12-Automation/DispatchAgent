@@ -9,6 +9,11 @@ Tables:
     technicians         — per-tech profile data, skills, and performance stats
     dispatch_decisions  — one row per ticket routed, with reasoning and audit trail
     dispatch_runs       — one row per routing run (manual or scheduled)
+    active_incidents    — repeat/storm fingerprint tracking
+    operator_notes      — human-authored dispatch instructions
+    agent_memory        — key-value working state across cycles
+    agent_traces        — full reasoning trace per ticket
+    support_types       — ConnectWise ticket type name → CW integer ID
 
 Usage:
     from src.clients.database import SessionLocal, init_db
@@ -405,6 +410,226 @@ class AgentTrace(Base):
         )
 
 
+# ── SupportType ───────────────────────────────────────────────────────────────
+
+class SupportType(Base):
+    """
+    ConnectWise ticket type name → CW integer ID.
+    Primary store for all ticket types; replaces the 'support types' section
+    of mappings.json.  Resolver checks this table first before falling back
+    to the JSON file.
+    """
+
+    __tablename__ = "support_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # Human-readable CW type name, e.g. "Network", "Azure AD", "Hardware - Server"
+    name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False, index=True)
+    # ConnectWise type integer ID
+    cw_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    def __repr__(self) -> str:
+        return f"<SupportType name={self.name!r} cw_id={self.cw_id}>"
+
+
+# ── Support-type DB helpers ────────────────────────────────────────────────────
+
+# The full type catalogue — seeded into the DB on init_db().
+SUPPORT_TYPES: Dict[str, int] = {
+    "Active Directory": 1101,
+    "Administrative": 1102,
+    "Adobe Acrobat": 1179,
+    "Alert": 1103,
+    "AnyConnect VPN": 1180,
+    "Application": 1104,
+    "AutoCAD": 1181,
+    "Axcient/Replibit Backup": 1182,
+    "Azure AD": 1105,
+    "Barracuda": 1183,
+    "Barracuda Quarantine": 1106,
+    "Break-fix": 1107,
+    "CHANGE THIS": 1108,
+    "Child": 1109,
+    "Computer Workstation": 1110,
+    "Copier": 1111,
+    "Dark Web ID": 1184,
+    "Datto Workplace": 1185,
+    "Domain Registration": 1186,
+    "Email": 1112,
+    "Email (Microsoft 365)": 1113,
+    "Email (Other)": 1114,
+    "Entra Connect Sync (Azure AD Sync)": 1187,
+    "Fax": 1115,
+    "Hardware - Android Phone": 1116,
+    "Hardware - Conference": 1117,
+    "Hardware - Other": 1120,
+    "Hardware - Other Tablet": 1121,
+    "Hardware - Peripheral": 1122,
+    "Hardware - Server": 1123,
+    "Hardware - UPS": 1189,
+    "Hardware - Workstation": 1124,
+    "Hardware - iPad": 1118,
+    "Hardware - iPhone": 1119,
+    "Hosted": 1125,
+    "Huntress": 1126,
+    "In Shop Network Device": 1127,
+    "In Shop Project Planning": 1128,
+    "In Shop Server": 1129,
+    "In Shop Workstation": 1130,
+    "In-Shop": 1132,
+    "Information Request": 1131,
+    "KnowBe4": 1190,
+    "MOVE TICKET FROM DISPATCH": 1142,
+    "Managed Services": 1133,
+    "Meraki": 1134,
+    "Microsoft 365": 1135,
+    "Mobile Application - Android": 1136,
+    "Mobile Application - Other": 1139,
+    "Mobile Application - iPad": 1137,
+    "Mobile Application - iPhone": 1138,
+    "Mobile OS - Android": 1140,
+    "Mobile OS - iOS": 1141,
+    "NetXtender VPN": 1191,
+    "Network": 1143,
+    "OS - Linux Server": 1151,
+    "OS - Linux Workstation": 1152,
+    "OS - Other Server": 1154,
+    "OS - Other Workstation": 1155,
+    "OS - Windows 10": 1156,
+    "OS - Windows 11": 1157,
+    "OS - Windows Server": 1158,
+    "OS - macOS Workstation": 1153,
+    "On-Site": 1144,
+    "Onsite Mobile Phone": 1145,
+    "Onsite Network Device": 1146,
+    "Onsite Project Planning": 1147,
+    "Onsite Server": 1148,
+    "Onsite Traning": 1149,
+    "Onsite Workstation": 1150,
+    "Parent": 1159,
+    "Peripherals": 1160,
+    "Phone": 1161,
+    "Printer": 1162,
+    "Procurement": 1197,
+    "Project": 1163,
+    "Reactive": 1164,
+    "Remote": 1165,
+    "Remote Access": 1192,
+    "Remote Desktop Connection": 1193,
+    "Remote Mobile Phone": 1166,
+    "Remote Network Device": 1167,
+    "Remote Project Planning": 1168,
+    "Remote Server": 1169,
+    "Remote Training": 1170,
+    "Remote Workstation": 1171,
+    "Scanner": 1172,
+    "Server": 1173,
+    "Site Visit": 1174,
+    "Software": 1175,
+    "Trimble": 1194,
+    "USM Site Visit": 1176,
+    "VPN": 1177,
+    "Windows Login": 1178,
+    "Windows VPN": 1195,
+    "ZoomInfo": 1196,
+    "gINT": 1188,
+    "Autodesk": 1198,
+    "Revit": 1199,
+    "Disc Space": 1200,
+    "Website": 1201,
+    "Pax8": 1202,
+    "Offboarding/Onboarding": 1203,
+    "Wireless/Wifi": 1204,
+    "Ninja": 1205,
+    "Antivirus": 1206,
+    "Uptime Robot": 1207,
+    "SSL": 1208,
+    "Fortinet": 1209,
+    "Sentinel One": 1210,
+    "Automation": 1211,
+    "Dev Work/Scripting": 1212,
+    "Bluebeam": 1213,
+    "IP Address": 1214,
+    "Speakers/Audio": 1215,
+    "Display/Video": 1216,
+    "Quickbooks": 1217,
+}
+
+
+def seed_support_types(session=None) -> int:
+    """
+    Upsert all entries from SUPPORT_TYPES into the support_types table.
+    Creates a temporary session if one is not provided.
+    Returns the number of rows inserted or updated.
+    """
+    _own_session = session is None
+    if _own_session:
+        session = SessionLocal()
+    try:
+        count = 0
+        for name, cw_id in SUPPORT_TYPES.items():
+            row = session.query(SupportType).filter_by(name=name).first()
+            if row is None:
+                session.add(SupportType(name=name, cw_id=cw_id))
+                count += 1
+            elif row.cw_id != cw_id:
+                row.cw_id = cw_id
+                row.updated_at = datetime.now(timezone.utc)
+                count += 1
+        session.commit()
+        return count
+    finally:
+        if _own_session:
+            session.close()
+
+
+def lookup_support_type(name: str) -> Optional[int]:
+    """
+    Look up a CW type ID by name from the database.
+    Case-insensitive.  Returns None if not found.
+
+    This is the primary type-resolution path; resolver.py falls back to
+    mappings.json only when this returns None.
+    """
+    if not name:
+        return None
+    session = SessionLocal()
+    try:
+        # Exact match first
+        row = session.query(SupportType).filter(
+            SupportType.name == name
+        ).first()
+        if row is not None:
+            return row.cw_id
+        # Case-insensitive fallback
+        name_lower = name.strip().lower()
+        for st in session.query(SupportType).all():
+            if st.name.lower() == name_lower:
+                return st.cw_id
+        return None
+    finally:
+        session.close()
+
+
+def get_all_support_types(session=None) -> List[Dict[str, Any]]:
+    """Return all support types as a list of {name, cw_id} dicts, sorted by name."""
+    _own_session = session is None
+    if _own_session:
+        session = SessionLocal()
+    try:
+        rows = session.query(SupportType).order_by(SupportType.name).all()
+        return [{"name": r.name, "cw_id": r.cw_id} for r in rows]
+    finally:
+        if _own_session:
+            session.close()
+
+
 # ── Initialiser ───────────────────────────────────────────────────────────────
 
 def migrate_db() -> None:
@@ -430,6 +655,7 @@ def migrate_db() -> None:
 
 
 def init_db() -> None:
-    """Create all tables that don't yet exist. Safe to call multiple times."""
+    """Create all tables and seed reference data. Safe to call multiple times."""
     Base.metadata.create_all(bind=_engine)
     migrate_db()
+    seed_support_types()

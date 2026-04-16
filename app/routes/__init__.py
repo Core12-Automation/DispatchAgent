@@ -20,7 +20,9 @@ def register_blueprints(app: Flask) -> None:
     from app.routes.dispatcher_routes   import bp as dispatcher_bp
     from app.routes.health              import bp as health_bp
     from app.routes.notes               import bp as notes_bp
+    from app.routes.types               import bp as types_bp
 
     for bp in (config_bp, env_bp, mappings_bp, members_bp, run_bp, bulk_edit_bp,
-               search_bp, report_bp, dispatch_bp, dispatcher_bp, health_bp, notes_bp):
+               search_bp, report_bp, dispatch_bp, dispatcher_bp, health_bp, notes_bp,
+               types_bp):
         app.register_blueprint(bp)

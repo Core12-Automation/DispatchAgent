@@ -71,13 +71,22 @@ def run_bulk_editor(params: Dict[str, Any], stop_event: threading.Event) -> None
     statuses_map = {str(k).lower(): int(v) for k, v in (mappings.get(status_key) or {}).items()}
     members_map  = {str(k).lower(): int(v) for k, v in (mappings.get("members") or {}).items()}
 
-    type_map: Dict[str, int] = {}
-    for tkey in (f"{board_name.lower()} types", "support types"):
-        type_map.update({str(k).lower(): int(v) for k, v in (mappings.get(tkey) or {}).items()})
+    # Resolve type ID: DB is primary source; mappings.json is legacy fallback
+    new_type_id: Optional[int] = None
+    if do_type and new_type:
+        from src.clients.database import lookup_support_type
+        new_type_id = lookup_support_type(new_type)
+        if new_type_id is None:
+            # Legacy fallback: board-scoped then global "support types" in mappings.json
+            type_map: Dict[str, int] = {}
+            for tkey in (f"{board_name.lower()} types", "support types"):
+                type_map.update(
+                    {str(k).lower(): int(v) for k, v in (mappings.get(tkey) or {}).items()}
+                )
+            new_type_id = type_map.get(new_type.lower())
 
     new_status_id    = statuses_map.get(new_status.lower()) if do_status and new_status else None
     assign_member_id = members_map.get(assign_to.lower())   if do_assign and assign_to  else None
-    new_type_id      = type_map.get(new_type.lower())        if do_type   and new_type   else None
 
     broadcast("=" * 60)
     broadcast(f"Bulk Ticket Editor  \u2014  {time.strftime('%Y-%m-%d %H:%M:%S')}")
