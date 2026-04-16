@@ -37,6 +37,236 @@ TIMEOUT_SECONDS = 120
 # Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
+def run_dispatch_batch(
+    tickets: List[Dict[str, Any]],
+    *,
+    config: Dict[str, Any],
+    mappings: Dict[str, Any],
+    dry_run: Optional[bool] = None,
+    broadcaster: Optional[Callable[[str], None]] = None,
+    briefing: str = "",
+) -> Dict[str, Any]:
+    """
+    Process a batch of pre-enriched tickets with full situational awareness.
+
+    Each ticket in *tickets* should already have a ``_context`` key added by
+    ``PatternDetector.analyze_ticket()``.
+
+    Returns the same structure as ``run_dispatch`` but covers all tickets.
+    """
+    from src.clients.anthropic_client import AnthropicClient
+    from src.agent.tool_definitions import TOOL_DEFINITIONS
+    from src.agent.prompts import build_dispatch_system_prompt
+    from src.agent.tool_registry import ToolRegistry
+
+    _broadcast = broadcaster or (lambda msg: log.info("[dispatch] %s", msg))
+    effective_dry_run = dry_run if dry_run is not None else config.get("dry_run", True)
+    model: str = config.get("claude_model", "claude-sonnet-4-6")
+
+    _broadcast("─" * 60)
+    _broadcast(f"[Agent] Batch dispatch: {len(tickets)} ticket(s) | dry_run={effective_dry_run}")
+    _broadcast("─" * 60)
+
+    # ── Build roster ──────────────────────────────────────────────────────────
+    routing = mappings.get("agent_routing") or {}
+    roster = [
+        {
+            "identifier":   ident,
+            "display_name": info.get("display_name", ident),
+            "description":  info.get("description", ""),
+        }
+        for ident, info in routing.items()
+        if isinstance(info, dict) and info.get("routable") is True
+    ]
+
+    # ── Build system prompt with situational briefing ─────────────────────────
+    base_prompt = build_dispatch_system_prompt(roster, {**config, "dry_run": effective_dry_run})
+    system_prompt = base_prompt
+    if briefing:
+        system_prompt += "\n\n--- CURRENT SITUATION ---\n" + briefing
+
+    # ── Build tool registry ───────────────────────────────────────────────────
+    registry = ToolRegistry(
+        config=config,
+        mappings=mappings,
+        dry_run=effective_dry_run,
+        broadcaster=_broadcast,
+    )
+
+    tools_called: List[Dict[str, Any]] = []
+    decisions_made: List[Dict[str, Any]] = []
+    reasoning_trace: List[Dict[str, Any]] = []
+    start_time = time.time()
+
+    def execute_tool(tool_name: str, tool_input: Dict[str, Any]) -> Any:
+        t = round(time.time() - start_time, 2)
+        entry = {"tool": tool_name, "input": tool_input, "t": t}
+        input_preview = json.dumps(tool_input, default=str)
+        if len(input_preview) > 200:
+            input_preview = input_preview[:200] + "…"
+        _broadcast(f">> {tool_name}({input_preview})")
+        try:
+            result = registry.call(tool_name, tool_input)
+            entry["result"] = result
+            if tool_name == "log_dispatch_decision":
+                decisions_made.append(tool_input)
+            result_preview = json.dumps(result, default=str)
+            if len(result_preview) > 300:
+                result_preview = result_preview[:300] + "…"
+            _broadcast(f"<< {result_preview}")
+        except Exception as exc:
+            result = {"error": str(exc)}
+            entry["error"] = str(exc)
+            _broadcast(f"  ✗ {tool_name} raised: {exc}")
+        finally:
+            tools_called.append(entry)
+            reasoning_trace.append({"type": "tool_call", **entry})
+        return result
+
+    # ── Build batch user message ───────────────────────────────────────────────
+    ticket_lines: List[str] = []
+    for t in tickets:
+        ctx = t.get("_context", {})
+        priority = (t.get("priority") or {}).get("name", "?") if isinstance(t.get("priority"), dict) else "?"
+        company = (t.get("company") or {}).get("name", "Unknown") if isinstance(t.get("company"), dict) else "Unknown"
+        summary = (t.get("summary") or "").strip()
+        tid = t.get("id", "?")
+
+        line = f"TICKET #{tid} ({priority}): {summary}\n  Company: {company}"
+
+        if ctx.get("is_repeat"):
+            line += (
+                f"\n  *** REPEAT: occurrence #{ctx['occurrence_count']} "
+                f"since {ctx['first_seen']}"
+            )
+            if ctx.get("already_assigned_to"):
+                line += f", already assigned to {ctx['already_assigned_to']}"
+            line += f"\n  Incident ID: {ctx.get('incident_id')} (key: {ctx.get('incident_key')})"
+
+        if ctx.get("is_storm"):
+            line += (
+                f"\n  *** ALERT STORM: {ctx['occurrence_count']} occurrences "
+                f"in the last hour — likely one root cause"
+            )
+
+        if ctx.get("matching_operator_notes"):
+            line += "\n  OPERATOR NOTES APPLY:"
+            for note in ctx["matching_operator_notes"]:
+                line += f"\n     * {note}"
+
+        ticket_lines.append(line)
+
+    user_message = (
+        f"Dispatch cycle: {len(tickets)} ticket(s) to process.\n\n"
+        + "\n\n".join(ticket_lines)
+        + "\n\nProcess each ticket. For repeats and storms, prefer "
+        "group_with_incident() over assigning to a new tech. Follow "
+        "all operator instructions. Call log_dispatch_decision for every ticket."
+    )
+
+    # ── Agentic loop ──────────────────────────────────────────────────────────
+    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    if not api_key:
+        return {
+            "status": "error", "error": "ANTHROPIC_API_KEY not set",
+            "decisions_made": decisions_made, "tools_called": tools_called,
+            "reasoning_trace": reasoning_trace,
+            "elapsed_seconds": round(time.time() - start_time, 2),
+            "iterations": 0, "dry_run": effective_dry_run,
+        }
+
+    try:
+        client = AnthropicClient(api_key=api_key, default_model=model)
+    except ValueError as exc:
+        return {
+            "status": "error", "error": str(exc),
+            "decisions_made": decisions_made, "tools_called": tools_called,
+            "reasoning_trace": reasoning_trace,
+            "elapsed_seconds": round(time.time() - start_time, 2),
+            "iterations": 0, "dry_run": effective_dry_run,
+        }
+
+    messages: List[Dict[str, Any]] = [{"role": "user", "content": user_message}]
+    final_text = ""
+    iterations = 0
+    stop_reason = "ok"
+    # Increase limits for batch processing
+    batch_max_iterations = MAX_ITERATIONS + len(tickets) * 3
+
+    while iterations < batch_max_iterations:
+        if time.time() - start_time > TIMEOUT_SECONDS * 2:
+            _broadcast(f"[Agent] ⏱ Batch timeout after {TIMEOUT_SECONDS * 2}s")
+            stop_reason = "timeout"
+            break
+
+        iterations += 1
+        _broadcast(f"[Agent] Iteration {iterations}/{batch_max_iterations}")
+
+        try:
+            response = client._client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=messages,
+                tools=TOOL_DEFINITIONS,
+            )
+        except Exception as exc:
+            _broadcast(f"[Agent] ✗ API error: {exc}")
+            stop_reason = "error"
+            break
+
+        messages.append({"role": "assistant", "content": response.content})
+
+        for block in response.content:
+            if hasattr(block, "text") and block.text:
+                _broadcast(f"[Claude] {block.text}")
+                reasoning_trace.append({
+                    "type": "text", "iteration": iterations,
+                    "text": block.text, "t": round(time.time() - start_time, 2),
+                })
+
+        if response.stop_reason == "end_turn":
+            for block in response.content:
+                if hasattr(block, "text"):
+                    final_text = block.text
+                    break
+            _broadcast(f"[Agent] ✓ Batch complete after {iterations} iteration(s)")
+            stop_reason = "ok"
+            break
+
+        if response.stop_reason != "tool_use":
+            stop_reason = f"unexpected_stop:{response.stop_reason}"
+            break
+
+        tool_results: List[Dict[str, Any]] = []
+        for block in response.content:
+            if not hasattr(block, "type") or block.type != "tool_use":
+                continue
+            result = execute_tool(block.name, dict(block.input))
+            tool_results.append({
+                "type":        "tool_result",
+                "tool_use_id": block.id,
+                "content":     json.dumps(result, default=str),
+            })
+        messages.append({"role": "user", "content": tool_results})
+    else:
+        stop_reason = "max_iterations"
+
+    elapsed = round(time.time() - start_time, 2)
+    _broadcast(f"[Agent] Batch done — {len(tools_called)} tool call(s), {elapsed}s")
+
+    return {
+        "status":           stop_reason,
+        "summary":          final_text,
+        "decisions_made":   decisions_made,
+        "tools_called":     tools_called,
+        "reasoning_trace":  reasoning_trace,
+        "elapsed_seconds":  elapsed,
+        "iterations":       iterations,
+        "dry_run":          effective_dry_run,
+    }
+
+
 def run_dispatch(
     ticket: Dict[str, Any],
     *,
@@ -112,26 +342,39 @@ def run_dispatch(
     # ── Metrics ───────────────────────────────────────────────────────────────
     tools_called: List[Dict[str, Any]] = []
     decisions_made: List[Dict[str, Any]] = []
+    reasoning_trace: List[Dict[str, Any]] = []
     start_time = time.time()
 
     # ── Tool executor (called by the loop on each tool_use block) ────────────
     def execute_tool(tool_name: str, tool_input: Dict[str, Any]) -> Any:
+        t = round(time.time() - start_time, 2)
         entry = {
             "tool": tool_name,
             "input": tool_input,
-            "t": round(time.time() - start_time, 2),
+            "t": t,
         }
+        # Broadcast call with truncated input
+        input_preview = json.dumps(tool_input, default=str)
+        if len(input_preview) > 200:
+            input_preview = input_preview[:200] + "…"
+        _broadcast(f">> {tool_name}({input_preview})")
+
         try:
             result = registry.call(tool_name, tool_input)
             entry["result"] = result
             if tool_name == "log_dispatch_decision":
                 decisions_made.append(tool_input)
+            result_preview = json.dumps(result, default=str)
+            if len(result_preview) > 300:
+                result_preview = result_preview[:300] + "…"
+            _broadcast(f"<< {result_preview}")
         except Exception as exc:
             result = {"error": str(exc)}
             entry["error"] = str(exc)
             _broadcast(f"  ✗ {tool_name} raised: {exc}")
         finally:
             tools_called.append(entry)
+            reasoning_trace.append({"type": "tool_call", **entry})
         return result
 
     # ── Build user message ────────────────────────────────────────────────────
@@ -192,8 +435,19 @@ def run_dispatch(
         # Append assistant turn
         messages.append({"role": "assistant", "content": response.content})
 
+        # Broadcast + record any text Claude emitted this turn
+        for block in response.content:
+            if hasattr(block, "text") and block.text:
+                _broadcast(f"[Claude] {block.text}")
+                reasoning_trace.append({
+                    "type":      "text",
+                    "iteration": iterations,
+                    "text":      block.text,
+                    "t":         round(time.time() - start_time, 2),
+                })
+
         if response.stop_reason == "end_turn":
-            # Collect final text
+            # Collect final text (already broadcast above)
             for block in response.content:
                 if hasattr(block, "text"):
                     final_text = block.text
@@ -229,15 +483,24 @@ def run_dispatch(
     _broadcast(f"[Agent] Done — {len(tools_called)} tool call(s), {elapsed}s elapsed")
     _broadcast("─" * 60)
 
+    reasoning_trace.append({
+        "type":      "done",
+        "stop_reason": stop_reason,
+        "iterations": iterations,
+        "elapsed":    elapsed,
+        "t":          elapsed,
+    })
+
     return {
-        "status":          stop_reason,
-        "ticket_id":       ticket_id,
-        "summary":         final_text,
-        "decisions_made":  decisions_made,
-        "tools_called":    tools_called,
-        "elapsed_seconds": elapsed,
-        "iterations":      iterations,
-        "dry_run":         effective_dry_run,
+        "status":           stop_reason,
+        "ticket_id":        ticket_id,
+        "summary":          final_text,
+        "decisions_made":   decisions_made,
+        "tools_called":     tools_called,
+        "reasoning_trace":  reasoning_trace,
+        "elapsed_seconds":  elapsed,
+        "iterations":       iterations,
+        "dry_run":          effective_dry_run,
     }
 
 
@@ -254,13 +517,14 @@ def _error_result(
     dry_run: bool,
 ) -> Dict[str, Any]:
     return {
-        "status":          "error",
-        "ticket_id":       ticket_id,
-        "error":           error,
-        "summary":         "",
-        "decisions_made":  decisions_made,
-        "tools_called":    tools_called,
-        "elapsed_seconds": round(time.time() - start_time, 2),
-        "iterations":      0,
-        "dry_run":         dry_run,
+        "status":           "error",
+        "ticket_id":        ticket_id,
+        "error":            error,
+        "summary":          "",
+        "decisions_made":   decisions_made,
+        "tools_called":     tools_called,
+        "reasoning_trace":  [{"type": "error", "error": error, "t": 0}],
+        "elapsed_seconds":  round(time.time() - start_time, 2),
+        "iterations":       0,
+        "dry_run":          dry_run,
     }

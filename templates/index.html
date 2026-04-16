@@ -100,6 +100,39 @@
     gap: 12px;
   }
   #topbar h2 { font-size: 15px; font-weight: 600; flex: 1; }
+
+  /* ── Global mode toggle ── */
+  #mode-toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 6px 4px 12px;
+    user-select: none;
+  }
+  #mode-toggle-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .3px;
+    transition: color .2s;
+  }
+  #mode-toggle-wrap .toggle {
+    width: 42px;
+    height: 22px;
+  }
+  #mode-toggle-wrap .toggle-track {
+    border-radius: 11px;
+  }
+  #mode-toggle-wrap .toggle-track::before {
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+  }
+  #mode-toggle-wrap .toggle input:checked + .toggle-track { background: var(--red); }
+  #mode-toggle-wrap .toggle input:checked + .toggle-track::before { transform: translateX(20px); }
   #run-status-badge {
     padding: 3px 10px;
     border-radius: 12px;
@@ -185,10 +218,11 @@
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle-track {
     position: absolute; inset: 0;
-    background: var(--border);
+    background: #444c56;
     border-radius: 10px;
     cursor: pointer;
     transition: background .2s;
+    border: 1px solid #586069;
   }
   .toggle-track::before {
     content: '';
@@ -297,6 +331,50 @@
   .log-head  { color: var(--accent); font-weight: bold; }
   .log-agent { color: #79c0ff; }
 
+  /* ── Trace viewer ── */
+  .trace-list { display: flex; flex-direction: column; gap: 6px; }
+  .trace-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: border-color .15s;
+  }
+  .trace-row:hover { border-color: var(--accent); }
+  .trace-row .tr-id   { color: var(--muted); min-width: 32px; }
+  .trace-row .tr-tid  { color: var(--accent); min-width: 60px; font-weight: 600; }
+  .trace-row .tr-sum  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .trace-row .tr-st   { min-width: 70px; text-align: right; }
+  .trace-row .tr-ts   { color: var(--muted); min-width: 130px; text-align: right; }
+  .sb-ok      { color: var(--green); }
+  .sb-error   { color: var(--red); }
+  .sb-timeout { color: var(--yellow); }
+
+  #trace-detail { display: none; }
+  #trace-detail.open { display: block; }
+  .trace-event {
+    padding: 6px 10px;
+    border-left: 3px solid var(--border);
+    margin-bottom: 4px;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .trace-event.ev-text  { border-color: var(--accent); background: #162032; color: #b0c8e4; white-space: pre-wrap; word-break: break-word; }
+  .trace-event.ev-call  { border-color: var(--green); background: #0d2113; }
+  .trace-event.ev-call .ev-name  { color: var(--green); font-weight: bold; }
+  .trace-event.ev-call .ev-input { color: var(--muted); margin-top: 2px; }
+  .trace-event.ev-result { border-color: #3a4750; background: #111920; color: var(--muted); }
+  .trace-event.ev-done  { border-color: var(--purple); background: #1a1428; color: var(--purple); }
+  .trace-event.ev-error { border-color: var(--red); background: #2a1010; color: var(--red); }
+  .ev-result-toggle { color: var(--accent); cursor: pointer; font-size: 11px; margin-top: 2px; display: inline-block; }
+  .ev-result-body   { display: none; margin-top: 4px; white-space: pre-wrap; word-break: break-all; }
+  .ev-result-body.open { display: block; }
+
   /* ── Stats grid ── */
   .stats-grid {
     display: grid;
@@ -348,7 +426,7 @@
   }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--card2); }
-  td input, td select {
+  td input:not(.toggle input), td select {
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -358,7 +436,27 @@
     width: 100%;
     outline: none;
   }
-  td input:focus, td select:focus { border-color: var(--accent); }
+  td input:not(.toggle input):focus, td select:focus { border-color: var(--accent); }
+  /* Keep toggle inputs invisible inside table cells */
+  td .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+  /* Active/Inactive status pill in Members table */
+  .mem-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity .15s;
+    border: 1px solid transparent;
+  }
+  .mem-status-pill:hover { opacity: .8; }
+  .mem-status-pill.active   { background: #1a3a25; color: var(--green); border-color: #2ea043; }
+  .mem-status-pill.inactive { background: #2d1f1f; color: var(--muted); border-color: #444; }
   td textarea {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -602,9 +700,7 @@
     font-size: 12px;
     color: var(--muted);
     margin-bottom: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-break: break-word;
   }
   .decision-reason-wrap {
     margin-top: 6px;
@@ -700,17 +796,129 @@
     margin-top: 10px;
     padding-top: 10px;
     border-top: 1px solid var(--border);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     display: none;
   }
-  .tech-detail-row { margin-bottom: 4px; line-height: 1.5; }
+  .tech-detail-row { margin-bottom: 6px; line-height: 1.5; }
   .tech-detail-val { color: var(--text); }
+
+  /* ── Skills / Specialties tag section ── */
+  .tech-tags-section { margin-bottom: 10px; }
+  .tech-tags-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .tech-tags-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 24px;
+    align-items: center;
+  }
+  .tech-tag {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tech-tag-remove {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1;
+    display: none;
+  }
+  .tech-tags-section.editing .tech-tag-remove { display: inline; }
+  .tech-tag-remove:hover { color: var(--red); }
+  .tech-tag-empty { font-size: 11px; color: var(--muted); font-style: italic; }
+  .tech-tag-input {
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 11px;
+    min-width: 80px;
+    flex: 1;
+    display: none;
+  }
+  .tech-tags-section.editing .tech-tag-input { display: block; }
+  .tech-edit-btn {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--card2);
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .15s;
+  }
+  .tech-edit-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .tech-save-btn {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--green);
+    background: transparent;
+    color: var(--green);
+    cursor: pointer;
+    display: none;
+  }
+  .tech-tags-section.editing .tech-edit-btn { display: none; }
+  .tech-tags-section.editing .tech-save-btn { display: inline; }
+
+  /* ── Schedule section ── */
+  .tech-schedule {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .tech-schedule-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .tech-schedule-entry {
+    display: flex;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    align-items: flex-start;
+  }
+  .tech-schedule-entry:last-child { border-bottom: none; }
+  .tech-sched-time {
+    color: var(--accent);
+    font-family: var(--mono);
+    white-space: nowrap;
+    min-width: 80px;
+    font-size: 10px;
+    padding-top: 1px;
+  }
+  .tech-sched-subject { color: var(--text); flex: 1; }
+  .tech-sched-dur { color: var(--muted); white-space: nowrap; font-size: 10px; padding-top: 1px; }
+  .tech-sched-loading { color: var(--muted); font-style: italic; font-size: 11px; }
+  .tech-sched-empty { color: var(--muted); font-style: italic; font-size: 11px; }
 
   /* ── Dashboard layout ── */
   .dash-two-col {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 300px;
     gap: 20px;
     align-items: start;
   }
@@ -719,6 +927,120 @@
     max-height: 560px;
     overflow-y: auto;
   }
+
+  /* ── Agent Chat ── */
+  .agent-chat {
+    height: 520px;
+    overflow-y: auto;
+    background: #010409;
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    scroll-behavior: smooth;
+  }
+  .agent-chat:empty::before {
+    content: "Waiting for agent activity…";
+    color: #444d56;
+    font-style: italic;
+  }
+  .ac-divider {
+    color: #3a4048;
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: .5px;
+    padding: 6px 0 2px;
+    border-top: 1px solid #1c2128;
+    margin-top: 4px;
+  }
+  .ac-ticket {
+    background: rgba(188,140,255,.07);
+    border-left: 3px solid var(--purple);
+    padding: 6px 10px;
+    border-radius: 0 4px 4px 0;
+    margin: 2px 0;
+  }
+  .ac-ticket .ac-tid { color: var(--purple); font-weight: bold; }
+  .ac-ticket .ac-tsum { color: #ccc; }
+  .ac-ticket .ac-tmeta { color: var(--muted); font-size: 10.5px; margin-top: 1px; }
+  .ac-iter {
+    color: #444d56;
+    font-size: 10.5px;
+    padding: 4px 0 1px;
+  }
+  .ac-claude {
+    background: rgba(88,166,255,.06);
+    border-left: 3px solid var(--accent);
+    padding: 7px 10px;
+    border-radius: 0 4px 4px 0;
+    color: #b0c8e4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 2px 0;
+  }
+  .ac-claude::before {
+    content: "Claude  ";
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: .4px;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .ac-tool {
+    background: rgba(63,185,80,.05);
+    border-left: 3px solid var(--green);
+    padding: 5px 10px;
+    border-radius: 0 4px 4px 0;
+    margin: 2px 0;
+  }
+  .ac-tool-name { color: var(--green); font-weight: 700; }
+  .ac-tool-input { color: #6a9f6a; margin-top: 1px; font-size: 11px; }
+  .ac-result {
+    border-left: 3px solid #2d333b;
+    margin: 0 0 2px 6px;
+    padding: 3px 10px;
+    background: rgba(0,0,0,.25);
+    border-radius: 0 4px 4px 0;
+  }
+  .ac-result-toggle {
+    color: #555d68;
+    cursor: pointer;
+    font-size: 11px;
+    user-select: none;
+  }
+  .ac-result-toggle:hover { color: var(--muted); }
+  .ac-result-body {
+    display: none;
+    color: #555d68;
+    margin-top: 3px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 11px;
+  }
+  .ac-result-body.open { display: block; }
+  .ac-done {
+    color: var(--green);
+    padding: 4px 0;
+    font-size: 11px;
+  }
+  .ac-error {
+    border-left: 3px solid var(--red);
+    background: rgba(248,81,73,.06);
+    padding: 5px 10px;
+    color: #f85149;
+    border-radius: 0 4px 4px 0;
+    margin: 2px 0;
+  }
+  .ac-sys {
+    color: #444d56;
+    font-size: 11px;
+    padding: 1px 0;
+  }
+
   .dash-live-bar {
     display: flex;
     align-items: center;
@@ -783,10 +1105,6 @@
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.474l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg>
       Configuration
     </div>
-    <div class="nav-item" data-tab="agents" onclick="switchTab('agents', this)">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
-      Agents
-    </div>
     <div class="nav-item" data-tab="boards" onclick="switchTab('boards', this)">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z"/></svg>
       Boards &amp; Statuses
@@ -795,9 +1113,18 @@
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zM11 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm.5 2.5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4zm2 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1h-2zm0 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1h-2z"/></svg>
       Members
     </div>
+    <div class="nav-item" data-tab="techoverview" onclick="switchTab('techoverview', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+      Tech Overview
+    </div>
     <div class="nav-item" data-tab="env" onclick="switchTab('env', this)">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
       Environment
+    </div>
+
+    <div class="nav-item" data-tab="notes" onclick="switchTab('notes', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1H4z"/></svg>
+      Operator Notes
     </div>
 
     <div style="padding:8px 16px 4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px">Tools</div>
@@ -823,6 +1150,14 @@
   <div id="topbar">
     <h2 id="topbar-title">Dashboard</h2>
     <span id="run-status-badge" class="badge-idle">Idle</span>
+    <div id="mode-toggle-wrap" title="Toggle between Test Mode (no changes) and Live Mode (modifies tickets)">
+      <span id="mode-toggle-label" style="color:var(--green)">TEST</span>
+      <label class="toggle">
+        <input type="checkbox" id="global-mode-toggle">
+        <span class="toggle-track"></span>
+      </label>
+      <span id="mode-toggle-live-label" style="color:var(--muted)">LIVE</span>
+    </div>
     <button class="btn btn-secondary btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
 
@@ -855,40 +1190,32 @@
         </div>
       </div>
 
-      <div class="dash-two-col">
-
-        <!-- Section 1: Live Decision Feed -->
-        <div class="card" style="padding:0;overflow:hidden">
-          <h3 style="padding:14px 16px 12px;margin:0;border-radius:8px 8px 0 0;border-bottom:1px solid var(--border)">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383-4.758 2.855L15 11.114v-5.73zm-.034 6.878L9.271 8.82 8 9.583 6.728 8.82l-5.694 3.44A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.739zM1 11.114l4.758-2.876L1 5.383v5.73z"/></svg>
-            Live Decision Feed
-            <span id="dash-feed-badge" class="badge" style="background:var(--card2);color:var(--muted)">—</span>
-            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadDashboardDecisions()">↻</button>
-          </h3>
-          <div class="dash-live-bar">
-            <div class="dash-live-dot inactive" id="dash-live-dot"></div>
-            <div class="dash-live-msg" id="dash-live-msg">Not connected</div>
-          </div>
-          <div class="dash-feed-inner" id="dash-feed">
-            <div class="empty-state">No dispatch decisions yet.</div>
-          </div>
-        </div>
-
-        <!-- Section 2: Tech Overview -->
-        <div>
-          <div class="card" style="padding:0;overflow:hidden">
-            <h3 style="padding:14px 16px 12px;margin:0;border-radius:8px 8px 0 0;border-bottom:1px solid var(--border)">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
-              Tech Overview
-              <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px">(7-day workload)</span>
-            </h3>
-            <div style="padding:14px 14px 4px" id="dash-techs">
-              <div class="empty-state" style="padding:20px">Loading…</div>
-            </div>
-          </div>
-        </div>
-
+      <!-- Section 1: Agent Chat -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:20px">
+        <h3 style="padding:11px 16px 10px;margin:0;border-radius:8px 8px 0 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.678 11.894a1 1 0 0 1 .287.801 10.97 10.97 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8.06 8.06 0 0 0 8 14c3.996 0 7-2.807 7-6 0-3.192-3.004-6-7-6S1 4.808 1 8c0 1.468.617 2.83 1.678 3.894zm-.493 3.905a21.682 21.682 0 0 1-.713.129c-.2.032-.352-.176-.273-.362a9.68 9.68 0 0 0 .244-.637l.003-.01c.248-.72.45-1.548.524-2.319C.743 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7-3.582 7-8 7a9.06 9.06 0 0 1-2.347-.306c-.52.263-1.639.742-3.468 1.105z"/></svg>
+          Agent Reasoning
+          <div class="dash-live-dot" id="dash-live-dot" style="margin-left:4px"></div>
+          <span id="dash-live-msg" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:2px">Live</span>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto;font-size:10px" onclick="loadLatestTrace()">Load Last</button>
+          <button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="clearAgentChat()">Clear</button>
+        </h3>
+        <div class="agent-chat" id="agent-chat"></div>
       </div>
+
+      <!-- Section 3: Dispatch Decision Feed -->
+      <div class="card" style="padding:0;overflow:hidden;margin-top:0">
+        <h3 style="padding:12px 16px 10px;margin:0;border-radius:8px 8px 0 0;border-bottom:1px solid var(--border)">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383-4.758 2.855L15 11.114v-5.73zm-.034 6.878L9.271 8.82 8 9.583 6.728 8.82l-5.694 3.44A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.739zM1 11.114l4.758-2.876L1 5.383v5.73z"/></svg>
+          Routed Tickets
+          <span id="dash-feed-badge" class="badge" style="background:var(--card2);color:var(--muted)">—</span>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadDashboardDecisions()">↻</button>
+        </h3>
+        <div class="dash-feed-inner" id="dash-feed">
+          <div class="empty-state" style="padding:30px">No dispatch decisions recorded yet.</div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ══ RUN TAB ══ -->
@@ -1102,37 +1429,6 @@
     </div>
 
     <!-- ══ AGENTS TAB ══ -->
-    <div id="tab-agents" class="tab-panel">
-      <div class="card">
-        <h3>
-          Agent Routing
-          <span class="badge" style="background:#1a3a25;color:var(--green)" id="routable-count"></span>
-        </h3>
-        <p style="color:var(--muted);font-size:12px;margin-bottom:14px">
-          Toggle <strong>Routable</strong> to include/exclude an agent from AI selection.
-          Click any cell to edit inline. Changes are saved with the Save button.
-        </p>
-        <div class="tbl-wrap">
-          <table id="agents-table">
-            <thead>
-              <tr>
-                <th>Identifier</th>
-                <th>Display Name</th>
-                <th>Routable</th>
-                <th style="width:40%">Description</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="agents-tbody"></tbody>
-          </table>
-        </div>
-        <div class="section-actions">
-          <button class="btn btn-primary" onclick="saveAgents()">Save Agents</button>
-          <button class="btn btn-secondary" onclick="addAgentRow()">+ Add Agent</button>
-        </div>
-      </div>
-    </div>
-
     <!-- ══ BOARDS & STATUSES TAB ══ -->
     <div id="tab-boards" class="tab-panel">
       <div class="card">
@@ -1161,20 +1457,57 @@
     <!-- ══ MEMBERS TAB ══ -->
     <div id="tab-members" class="tab-panel">
       <div class="card">
-        <h3>Members</h3>
+        <h3>
+          Members
+          <span class="badge" style="background:#1a3a25;color:var(--green)" id="routable-count"></span>
+        </h3>
         <p style="color:var(--muted);font-size:12px;margin-bottom:14px">
           Maps ConnectWise member identifiers to their numeric member IDs.
-          These IDs are used when assigning ticket ownership.
+          Toggle <strong>Routable</strong> to include/exclude a technician from AI selection.
+          Active members appear in the Tech Overview dashboard panel.
         </p>
         <div class="tbl-wrap">
           <table id="members-table">
-            <thead><tr><th>Identifier</th><th>CW Member ID</th><th>Actions</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Identifier</th>
+                <th>Full Name</th>
+                <th>CW Member ID</th>
+                <th>Routable</th>
+                <th>Active</th>
+                <th style="width:30%">Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
             <tbody id="members-tbody"></tbody>
           </table>
         </div>
         <div class="section-actions">
           <button class="btn btn-primary" onclick="saveMembers()">Save Members</button>
           <button class="btn btn-secondary" onclick="addMemberRow()">+ Add Member</button>
+        </div>
+      </div>
+
+      <!-- Trace Viewer -->
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5zm0-1h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3z"/><path d="M6 8a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3A.5.5 0 0 1 6 8zm0-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zm0 5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5z"/></svg>
+          Reasoning Trace Log
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadTraces()">Refresh</button>
+        </h3>
+        <p style="color:var(--muted);font-size:12px;margin-bottom:14px">
+          Click any row to expand the full Claude reasoning loop — text turns, tool calls, and results.
+        </p>
+        <div class="trace-list" id="trace-list">
+          <div class="empty-state">No traces yet. Run a dispatch to see the reasoning log.</div>
+        </div>
+        <!-- Expanded trace detail -->
+        <div id="trace-detail" style="margin-top:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <strong style="font-size:13px" id="trace-detail-title">Trace</strong>
+            <button class="btn btn-secondary btn-sm" onclick="closeTrace()">✕ Close</button>
+          </div>
+          <div id="trace-events"></div>
         </div>
       </div>
     </div>
@@ -1561,6 +1894,89 @@
       </div>
     </div>
 
+    <!-- ══ OPERATOR NOTES TAB ══ -->
+    <div id="tab-notes" class="tab-panel">
+
+      <!-- Chat-style briefing input -->
+      <div class="card">
+        <h3>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1H4z"/></svg>
+          Brief the Dispatcher
+          <span class="badge" style="background:var(--accent-dim);color:var(--accent)">AI-parsed</span>
+        </h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:6px">
+          Type a plain-English instruction. Claude will parse it into a structured note.
+        </p>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:10px">
+          Examples: &ldquo;Mike is out sick today, don&rsquo;t assign him anything&rdquo; &nbsp;&middot;&nbsp;
+          &ldquo;Acme Corp is doing Exchange migration this week, group all email alerts and assign to Sarah&rdquo; &nbsp;&middot;&nbsp;
+          &ldquo;Suppress Barracuda quarantine alerts for all clients until further notice&rdquo;
+        </p>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input type="text" id="notes-chat-input" placeholder="Type an instruction and press Enter…"
+            style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px 12px;outline:none;"
+            onkeydown="if(event.key==='Enter')sendNoteChat()">
+          <button class="btn btn-primary" onclick="sendNoteChat()" id="notes-chat-btn">Send</button>
+        </div>
+
+        <!-- Interpretation preview (before confirm) -->
+        <div id="notes-chat-preview" style="display:none;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Claude understood:</div>
+          <div id="notes-chat-interp" style="font-size:13px;color:var(--text);margin-bottom:8px"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success btn-sm" onclick="confirmNote()">✓ Confirm &amp; Save</button>
+            <button class="btn btn-secondary btn-sm" onclick="cancelNote()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active notes list -->
+      <div class="card">
+        <h3>
+          Active Operator Instructions
+          <span id="notes-count-badge" class="badge" style="background:var(--card2);color:var(--muted)">0</span>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer">
+              <input type="checkbox" id="notes-show-expired" onchange="loadNotes()"> Show expired
+            </label>
+            <button class="btn btn-secondary btn-sm" onclick="loadNotes()">↻ Refresh</button>
+          </div>
+        </h3>
+
+        <div id="notes-list" style="display:flex;flex-direction:column;gap:8px">
+          <div style="color:var(--muted);font-size:13px;padding:12px 0">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Current Briefing (collapsible) -->
+      <div class="card">
+        <h3 style="cursor:pointer" onclick="toggleBriefing()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+          Current Situation Briefing
+          <span id="briefing-toggle-icon" style="margin-left:auto;font-size:12px;color:var(--muted)">▶ Show</span>
+        </h3>
+        <div id="briefing-content" style="display:none">
+          <pre id="briefing-text" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;font-family:var(--mono);color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto">Loading...</pre>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="loadBriefing()">↻ Refresh</button>
+        </div>
+      </div>
+
+    </div><!-- /tab-notes -->
+
+    <!-- ══ TECH OVERVIEW TAB ══ -->
+    <div id="tab-techoverview" class="tab-panel">
+      <div class="card" style="padding:0;overflow:hidden">
+        <h3 style="padding:14px 16px 12px;margin:0;border-radius:8px 8px 0 0;border-bottom:1px solid var(--border)">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+          Tech Overview
+          <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px">(7-day workload)</span>
+        </h3>
+        <div style="padding:14px 14px 4px" id="dash-techs">
+          <div class="empty-state" style="padding:20px">Loading…</div>
+        </div>
+      </div>
+    </div><!-- /tab-techoverview -->
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1581,8 +1997,9 @@ let running   = false;
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 const TITLES = { dashboard:'Dashboard', run:'Run', dispatcher:'Dispatcher', config:'Configuration',
-                 agents:'Agents', boards:'Boards & Statuses', members:'Members', env:'Environment',
-                 'bulk-edit':'Bulk Ticket Editor', search:'Ticket Search', report:'Report' };
+                 boards:'Boards & Statuses', members:'Members', techoverview:'Tech Overview',
+                 env:'Environment', 'bulk-edit':'Bulk Ticket Editor', search:'Ticket Search',
+                 report:'Report', notes:'Operator Notes' };
 
 function switchTab(tab, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -1590,12 +2007,13 @@ function switchTab(tab, el) {
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
   document.getElementById('topbar-title').textContent = TITLES[tab] || tab;
-  if (tab === 'agents')     renderAgents();
-  if (tab === 'boards')     renderBoards();
-  if (tab === 'members')    renderMembers();
-  if (tab === 'env')        loadEnv();
-  if (tab === 'dispatcher') { loadDispatcherStatus(); loadDispatcherHistory(); }
-  if (tab === 'dashboard')  { loadDashboard(); connectDashSSE(); }
+  if (tab === 'boards')        renderBoards();
+  if (tab === 'members')       { renderMembers(); loadTraces(); }
+  if (tab === 'env')           loadEnv();
+  if (tab === 'dispatcher')    { loadDispatcherStatus(); loadDispatcherHistory(); }
+  if (tab === 'dashboard')     { loadDashboard(); connectDashSSE(); }
+  if (tab === 'notes')         loadNotes();
+  if (tab === 'techoverview')  loadDashboardTechs();
 }
 
 // ── API helpers ───────────────────────────────────────────────────────────────
@@ -1632,6 +2050,8 @@ async function loadConfig() {
 
   document.getElementById('dry-run-override').checked  = !!cfg.dry_run;
   updateDryLabel();
+  document.getElementById('global-mode-toggle').checked = !cfg.dry_run;
+  applyGlobalMode(!cfg.dry_run);
 
   setTags('boards',   cfg.boards_to_scan             || []);
   setTags('statuses', cfg.route_from_statuses         || []);
@@ -1717,34 +2137,11 @@ async function saveMappings() {
   return r;
 }
 
-// ── Agents ────────────────────────────────────────────────────────────────────
+// ── Agents / Routable ─────────────────────────────────────────────────────────
 function updateRoutableCount() {
   const count = Object.values(S.agentsData).filter(a => a.routable).length;
   const el = document.getElementById('routable-count');
   if (el) el.textContent = count + ' routable';
-}
-
-function renderAgents() {
-  const tbody = document.getElementById('agents-tbody');
-  tbody.innerHTML = '';
-  for (const [id, info] of Object.entries(S.agentsData)) {
-    const tr = document.createElement('tr');
-    tr.dataset.id = id;
-    tr.innerHTML = `
-      <td><input value="${esc(id)}" class="agent-id" data-orig="${esc(id)}" placeholder="identifier"></td>
-      <td><input value="${esc(info.display_name||'')}" class="agent-dn" placeholder="Display Name"></td>
-      <td>
-        <span class="pill ${info.routable ? 'pill-yes':'pill-no'}"
-              onclick="toggleRoutable(this, '${esc(id)}')" title="Click to toggle">
-          ${info.routable ? 'Yes' : 'No'}
-        </span>
-      </td>
-      <td><textarea class="agent-desc" rows="2">${esc(info.description||'')}</textarea></td>
-      <td><button class="btn btn-danger btn-sm" onclick="deleteAgent(this, '${esc(id)}')">Remove</button></td>
-    `;
-    tbody.appendChild(tr);
-  }
-  updateRoutableCount();
 }
 
 function toggleRoutable(el, id) {
@@ -1754,56 +2151,6 @@ function toggleRoutable(el, id) {
   el.textContent = current ? 'No' : 'Yes';
   if (S.agentsData[id]) S.agentsData[id].routable = !current;
   updateRoutableCount();
-}
-
-function deleteAgent(btn, id) {
-  if (!confirm(`Remove agent "${id}"?`)) return;
-  btn.closest('tr').remove();
-  delete S.agentsData[id];
-  updateRoutableCount();
-}
-
-function addAgentRow() {
-  const tbody = document.getElementById('agents-tbody');
-  const id = 'new_agent_' + Date.now();
-  S.agentsData[id] = { display_name: '', routable: true, description: '' };
-  const tr = document.createElement('tr');
-  tr.dataset.id = id;
-  tr.innerHTML = `
-    <td><input value="${esc(id)}" class="agent-id" data-orig="${esc(id)}" placeholder="identifier"></td>
-    <td><input value="" class="agent-dn" placeholder="Display Name"></td>
-    <td>
-      <span class="pill pill-yes" onclick="toggleRoutable(this, '${esc(id)}')" title="Click to toggle">Yes</span>
-    </td>
-    <td><textarea class="agent-desc" rows="2" placeholder="Description of what this agent handles..."></textarea></td>
-    <td><button class="btn btn-danger btn-sm" onclick="deleteAgent(this, '${esc(id)}')">Remove</button></td>
-  `;
-  tbody.appendChild(tr);
-  tr.querySelector('input').focus();
-}
-
-async function saveAgents() {
-  const tbody    = document.getElementById('agents-tbody');
-  const newRouting = {};
-  for (const tr of tbody.querySelectorAll('tr')) {
-    const idEl = tr.querySelector('.agent-id');
-    const dnEl = tr.querySelector('.agent-dn');
-    const descEl = tr.querySelector('.agent-desc');
-    const routEl = tr.querySelector('.pill');
-    if (!idEl) continue;
-    const id = idEl.value.trim();
-    if (!id) continue;
-    newRouting[id] = {
-      display_name: dnEl ? dnEl.value.trim() : '',
-      routable:     routEl ? routEl.classList.contains('pill-yes') : false,
-      description:  descEl ? descEl.value.trim() : '',
-    };
-  }
-  S.mappings.agent_routing = newRouting;
-  S.agentsData = { ...newRouting };
-  const r = await saveMappings();
-  if (r && r.ok) { toast('Agents saved'); updateRoutableCount(); }
-  else toast('Save failed: ' + (r?.error || 'Unknown'), 'err');
 }
 
 // ── Boards ────────────────────────────────────────────────────────────────────
@@ -1917,18 +2264,87 @@ async function saveStatuses() {
 }
 
 // ── Members ───────────────────────────────────────────────────────────────────
-function renderMembers() {
+// Cache DB profiles keyed by cw_member_id for active-status lookups
+let _memberProfiles = {};
+
+async function renderMembers() {
+  // Run migration to seed DB from mappings for any first-time load
+  api('POST', '/api/members/sync').catch(() => {});
+
+  // DB is the sole source of truth — fetch all profiles
+  let profiles = [];
+  try {
+    profiles = await api('GET', '/api/members');
+    if (!Array.isArray(profiles)) profiles = [];
+  } catch (_) {}
+
+  _memberProfiles = {};
+  for (const p of profiles) {
+    if (p.cw_member_id != null) _memberProfiles[p.cw_member_id] = p;
+    if (p.cw_identifier)        _memberProfiles[p.cw_identifier] = p;
+  }
+
   const tbody = document.getElementById('members-tbody');
   tbody.innerHTML = '';
-  for (const [name, id] of Object.entries(S.mappings.members || {})) {
+
+  for (const p of profiles) {
+    const ident      = p.cw_identifier || p.technician || '';
+    const cwId       = p.cw_member_id ?? '';
+    const isActive   = p.is_active !== false;
+    const isRoutable = p.routable !== false;
+
     const tr = document.createElement('tr');
+    tr.dataset.dbId = p.id;
     tr.innerHTML = `
-      <td><input value="${esc(name)}" class="mem-name" data-orig="${esc(name)}"></td>
-      <td><input value="${esc(String(id))}" class="mem-id" type="number"></td>
-      <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Remove</button></td>
+      <td><input value="${esc(ident)}" class="mem-name" data-orig="${esc(ident)}"></td>
+      <td><input value="${esc(p.name || '')}" class="mem-fullname" placeholder="Full Name"></td>
+      <td><input value="${esc(String(cwId))}" class="mem-id" type="number" placeholder="CW Member ID"></td>
+      <td>
+        <span class="pill ${isRoutable ? 'pill-yes' : 'pill-no'}"
+              onclick="toggleRoutable(this, '${esc(ident)}')" title="Click to toggle">
+          ${isRoutable ? 'Yes' : 'No'}
+        </span>
+      </td>
+      <td>
+        <span class="mem-status-pill ${isActive ? 'active' : 'inactive'}"
+              onclick="toggleMemberPill(this)"
+              title="Click to toggle active/inactive">
+          ${isActive ? '● Active' : '○ Inactive'}
+        </span>
+        <input type="hidden" class="mem-active" value="${isActive ? '1' : '0'}">
+      </td>
+      <td><textarea class="agent-desc" rows="2" placeholder="Description…">${esc(p.description || '')}</textarea></td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteMember(this, '${esc(ident)}')">Remove</button></td>
     `;
     tbody.appendChild(tr);
   }
+  updateRoutableCount();
+}
+
+async function deleteMember(btn, ident) {
+  if (!confirm(`Remove member "${ident}"?`)) return;
+  const tr = btn.closest('tr');
+  tr.style.opacity = '0.4';
+  tr.style.pointerEvents = 'none';
+  const r = await api('DELETE', `/api/members/${encodeURIComponent(ident)}`).catch(() => null);
+  if (r && r.ok) {
+    tr.remove();
+    delete S.agentsData[ident];
+    updateRoutableCount();
+    toast(`${ident} removed`);
+  } else {
+    tr.style.opacity = '';
+    tr.style.pointerEvents = '';
+    toast('Delete failed', 'err');
+  }
+}
+
+function toggleMemberPill(pill) {
+  const input = pill.nextElementSibling;
+  const isNowActive = input.value !== '1';
+  input.value = isNowActive ? '1' : '0';
+  pill.className = `mem-status-pill ${isNowActive ? 'active' : 'inactive'}`;
+  pill.textContent = isNowActive ? '● Active' : '○ Inactive';
 }
 
 function addMemberRow() {
@@ -1936,24 +2352,81 @@ function addMemberRow() {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td><input value="" class="mem-name" placeholder="identifier" data-orig=""></td>
+    <td><input value="" class="mem-fullname" placeholder="Full Name"></td>
     <td><input value="" class="mem-id" type="number" placeholder="CW Member ID"></td>
-    <td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Remove</button></td>
+    <td>
+      <span class="pill pill-yes" onclick="toggleRoutable(this, '')" title="Click to toggle">Yes</span>
+    </td>
+    <td>
+      <span class="mem-status-pill active" onclick="toggleMemberPill(this)" title="Click to toggle active/inactive">● Active</span>
+      <input type="hidden" class="mem-active" value="1">
+    </td>
+    <td><textarea class="agent-desc" rows="2" placeholder="Description…"></textarea></td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteMember(this, '')">Remove</button></td>
   `;
   tbody.appendChild(tr);
   tr.querySelector('input').focus();
 }
 
 async function saveMembers() {
-  const members = {};
+  const members      = {};
+  const agentRouting = {};
+  const dbUpdates    = [];
+
   for (const tr of document.querySelectorAll('#members-tbody tr')) {
-    const name = tr.querySelector('.mem-name').value.trim();
-    const id   = parseInt(tr.querySelector('.mem-id').value);
-    if (name && !isNaN(id)) members[name] = id;
+    const ident    = tr.querySelector('.mem-name').value.trim();
+    const cwIdRaw  = tr.querySelector('.mem-id').value;
+    const cwId     = parseInt(cwIdRaw);
+    const isActive = tr.querySelector('.mem-active').value === '1';
+    const fullName = tr.querySelector('.mem-fullname')?.value.trim() || '';
+    const desc     = tr.querySelector('.agent-desc')?.value.trim() || '';
+    const routEl   = tr.querySelector('.pill');
+    const routable = routEl ? routEl.classList.contains('pill-yes') : true;
+
+    if (!ident) continue;
+
+    // Keep mappings.json in sync for the agent dispatch loop
+    if (!isNaN(cwId) && cwIdRaw !== '') members[ident] = cwId;
+    agentRouting[ident] = { display_name: fullName, routable, description: desc };
+
+    dbUpdates.push({
+      ident,
+      cw_member_id: (!isNaN(cwId) && cwIdRaw !== '') ? cwId : null,
+      name: fullName,
+      routable,
+      description: desc,
+      is_active: isActive,
+      cw_identifier: ident,
+    });
   }
-  S.mappings.members = members;
-  const r = await saveMappings();
-  if (r && r.ok) toast('Members saved');
-  else toast('Save failed: ' + (r?.error || 'Unknown'), 'err');
+
+  S.mappings.members       = members;
+  S.mappings.agent_routing = agentRouting;
+  S.agentsData = { ...agentRouting };
+  updateRoutableCount();
+
+  // Save mappings for agent compat (best-effort — don't block on failure)
+  saveMappings().catch(() => {});
+
+  // Persist everything to DB
+  const results = await Promise.all(
+    dbUpdates.map(({ ident, ...fields }) =>
+      api('PUT', `/api/members/${encodeURIComponent(ident)}`, fields)
+        .then(r => { if (!r || !r.ok) console.error('Save failed for', ident, r); return r; })
+        .catch(e => { console.error('Save error for', ident, e); return null; })
+    )
+  );
+
+  const failed = results.filter(r => !r || !r.ok);
+  if (failed.length) {
+    toast(`${failed.length} save(s) failed — check console`, 'err');
+  } else {
+    toast(`Saved ${results.length} member(s)`);
+  }
+
+  // Re-render from DB to confirm what was actually persisted
+  await renderMembers();
+  loadDashboardTechs();
 }
 
 // ── Environment ───────────────────────────────────────────────────────────────
@@ -1987,6 +2460,34 @@ async function saveEnv() {
   else toast('Save failed: ' + (r.errors || []).join(', '), 'err');
 }
 
+// ── Global mode toggle (TEST / LIVE) ──────────────────────────────────────────
+// Checked = LIVE mode; unchecked = TEST mode (dry run).
+function applyGlobalMode(isLive) {
+  const testLabel = document.getElementById('mode-toggle-label');
+  const liveLabel = document.getElementById('mode-toggle-live-label');
+  testLabel.style.color = isLive ? 'var(--muted)' : 'var(--green)';
+  liveLabel.style.color = isLive ? 'var(--red)'   : 'var(--muted)';
+
+  // Sync the per-tab dry-run controls (dry = !live)
+  const dryRunEl   = document.getElementById('dry-run-override');
+  const diagnosticEl = document.getElementById('be-diagnostic');
+  if (dryRunEl)   { dryRunEl.checked   = !isLive; updateDryLabel(); }
+  if (diagnosticEl) {
+    diagnosticEl.checked = !isLive;
+    diagnosticEl.dispatchEvent(new Event('change'));
+  }
+}
+
+document.getElementById('global-mode-toggle').addEventListener('change', function() {
+  applyGlobalMode(this.checked);
+});
+
+// Keep global toggle in sync when per-tab controls are changed directly
+document.getElementById('dry-run-override').addEventListener('change', function() {
+  document.getElementById('global-mode-toggle').checked = !this.checked;
+  applyGlobalMode(!this.checked);
+});
+
 // ── Run ───────────────────────────────────────────────────────────────────────
 function updateDryLabel() {
   const isDry = document.getElementById('dry-run-override').checked;
@@ -1994,7 +2495,6 @@ function updateDryLabel() {
     ? 'Dry Run (no changes)' : 'Live Run (WILL modify tickets)';
   document.getElementById('dry-label').style.color = isDry ? 'var(--muted)' : 'var(--yellow)';
 }
-document.getElementById('dry-run-override').addEventListener('change', updateDryLabel);
 
 async function startRun() {
   if (running) return;
@@ -2119,7 +2619,6 @@ function esc(s) {
 async function refreshAll() {
   await Promise.all([loadConfig(), loadMappings()]);
   const activeTab = document.querySelector('.nav-item.active')?.dataset.tab;
-  if (activeTab === 'agents')    renderAgents();
   if (activeTab === 'boards')    renderBoards();
   if (activeTab === 'members')   renderMembers();
   if (activeTab === 'dashboard') loadDashboard();
@@ -2437,8 +2936,9 @@ async function loadDashboard() {
   await Promise.all([
     loadDashboardMetrics(),
     loadDashboardDecisions(),
-    loadDashboardTechs(),
   ]);
+  // Pre-populate chat with last recorded trace (non-blocking)
+  loadLatestTrace().catch(() => {});
 }
 
 // ── Section 1: Live Decision Feed ─────────────────────────────────────────────
@@ -2451,6 +2951,61 @@ async function loadDashboardDecisions() {
       renderDecisionFeed(decisions);
     }
   } catch (_) {}
+}
+
+function buildDecisionCard(d) {
+  const ticketUrl = id => _cwBaseUrl
+    ? `${_cwBaseUrl}/v4_6_release/ConnectWise.aspx?locale=en_US&routeId=ServiceFV&noFormHost=true&recordType=ServiceTicket&recid=${id}`
+    : null;
+
+  const url = ticketUrl(d.ticket_id);
+  const ticketCell = url
+    ? `<a class="decision-ticket-link" href="${url}" target="_blank" rel="noopener">#${esc(String(d.ticket_id))}</a>`
+    : `<span class="decision-ticket-link" style="cursor:default">#${esc(String(d.ticket_id))}</span>`;
+
+  const conf = d.confidence != null ? parseFloat(d.confidence) : null;
+  let confClass = 'conf-yellow';
+  if (conf !== null) {
+    confClass = conf >= 0.8 ? 'conf-green' : conf >= 0.5 ? 'conf-yellow' : 'conf-red';
+  }
+  const confBadge = conf !== null
+    ? `<span class="conf-badge ${confClass}">${conf.toFixed(2)}</span>`
+    : '';
+
+  const statusBadge = d.assigned_to
+    ? (d.was_dry_run
+        ? `<span class="status-badge sb-dry">DRY</span>`
+        : `<span class="status-badge sb-assigned">Assigned</span>`)
+    : `<span class="status-badge sb-flagged">Flagged</span>`;
+
+  const techStr = d.assigned_to ? esc(d.assigned_to) : '<span style="color:var(--muted)">—</span>';
+
+  const reasonHtml = d.reason
+    ? `<button class="decision-expand-btn" onclick="toggleDecisionReason(this)" title="Toggle reasoning">▸ Reason</button>`
+    : '';
+
+  const reasonBlock = d.reason
+    ? `<div class="decision-reason-wrap" style="display:none"><div class="decision-reason">${esc(d.reason)}</div></div>`
+    : '';
+
+  const ts = d.created_at ? d.created_at.replace('T', ' ').replace(/\.\d+.*$/, '') : '—';
+  const summary = d.ticket_summary ? esc(d.ticket_summary) : '<em style="color:var(--muted)">No summary</em>';
+
+  const el = document.createElement('div');
+  el.className = 'decision-card';
+  el.dataset.decisionKey = String(d.ticket_id) + '_' + (d.created_at || '');
+  el.innerHTML = `
+    <div class="decision-meta">
+      <span class="decision-ts">${esc(ts)}</span>
+      ${ticketCell}
+      <span class="decision-tech">${techStr}</span>
+      ${confBadge}
+      ${statusBadge}
+      ${reasonHtml}
+    </div>
+    <div class="decision-summary">${summary}</div>
+    ${reasonBlock}`;
+  return el;
 }
 
 function renderDecisionFeed(decisions) {
@@ -2467,58 +3022,30 @@ function renderDecisionFeed(decisions) {
   badge.textContent = decisions.length;
   badge.style.cssText = 'background:#1a3a25;color:var(--green)';
 
-  const ticketUrl = id => _cwBaseUrl
-    ? `${_cwBaseUrl}/v4_6_release/ConnectWise.aspx?locale=en_US&routeId=ServiceFV&noFormHost=true&recordType=ServiceTicket&recid=${id}`
-    : null;
+  // Build a map of existing cards by key so we can preserve open reason panels
+  const existingCards = {};
+  feed.querySelectorAll('.decision-card[data-decision-key]').forEach(el => {
+    existingCards[el.dataset.decisionKey] = el;
+  });
 
-  feed.innerHTML = decisions.map(d => {
-    const url = ticketUrl(d.ticket_id);
-    const ticketCell = url
-      ? `<a class="decision-ticket-link" href="${url}" target="_blank" rel="noopener">#${esc(String(d.ticket_id))}</a>`
-      : `<span class="decision-ticket-link" style="cursor:default">#${esc(String(d.ticket_id))}</span>`;
+  const newKeys = new Set();
+  const fragment = document.createDocumentFragment();
 
-    const conf = d.confidence != null ? parseFloat(d.confidence) : null;
-    let confClass = 'conf-yellow';
-    if (conf !== null) {
-      confClass = conf >= 0.8 ? 'conf-green' : conf >= 0.5 ? 'conf-yellow' : 'conf-red';
+  for (const d of decisions) {
+    const key = String(d.ticket_id) + '_' + (d.created_at || '');
+    newKeys.add(key);
+
+    if (existingCards[key]) {
+      // Card already in DOM — keep it as-is to preserve open reason panel
+      fragment.appendChild(existingCards[key]);
+    } else {
+      fragment.appendChild(buildDecisionCard(d));
     }
-    const confBadge = conf !== null
-      ? `<span class="conf-badge ${confClass}">${conf.toFixed(2)}</span>`
-      : '';
+  }
 
-    const statusBadge = d.assigned_to
-      ? (d.was_dry_run
-          ? `<span class="status-badge sb-dry">DRY</span>`
-          : `<span class="status-badge sb-assigned">Assigned</span>`)
-      : `<span class="status-badge sb-flagged">Flagged</span>`;
-
-    const techStr = d.assigned_to ? esc(d.assigned_to) : '<span style="color:var(--muted)">—</span>';
-
-    const reasonHtml = d.reason
-      ? `<button class="decision-expand-btn" onclick="toggleDecisionReason(this)" title="Toggle reasoning">▸ Reason</button>`
-      : '';
-
-    const reasonBlock = d.reason
-      ? `<div class="decision-reason-wrap"><div class="decision-reason">${esc(d.reason)}</div></div>`
-      : '';
-
-    const ts = d.created_at ? d.created_at.replace('T', ' ').replace(/\.\d+.*$/, '') : '—';
-    const summary = d.ticket_summary ? esc(d.ticket_summary) : '<em style="color:var(--muted)">No summary</em>';
-
-    return `
-    <div class="decision-card">
-      <div class="decision-meta">
-        <span class="decision-ts">${esc(ts)}</span>
-        ${ticketCell}
-        <span class="decision-tech">${techStr}</span>
-        ${confBadge}
-        ${statusBadge}
-        ${reasonHtml}
-      </div>
-      <div class="decision-summary">${summary}</div>
-      ${reasonBlock}
-    </div>`;
-  }).join('');
+  // Replace content without touching cards that were preserved
+  feed.innerHTML = '';
+  feed.appendChild(fragment);
 }
 
 function toggleDecisionReason(btn) {
@@ -2530,7 +3057,10 @@ function toggleDecisionReason(btn) {
   btn.textContent = open ? '▸ Reason' : '▾ Reason';
 }
 
-// ── SSE: live dispatcher activity ─────────────────────────────────────────────
+// ── SSE: live agent chat ──────────────────────────────────────────────────────
+
+let _lastToolEl  = null;   // last tool-call element so result can attach to it
+let _lastSysLine = null;   // last ac-sys text, to deduplicate repeated status lines
 
 function connectDashSSE() {
   if (_dashSSE) { _dashSSE.close(); _dashSSE = null; }
@@ -2540,9 +3070,13 @@ function connectDashSSE() {
 
   _dashSSE = new EventSource('/api/run/stream');
 
+  // Track whether this SSE session actually saw live lines (vs. idle reconnect)
+  let _sseReceivedLines = false;
+
   _dashSSE.onopen = () => {
-    if (dot) { dot.classList.remove('inactive'); }
-    if (msg)   msg.textContent = 'Connected — listening for dispatcher activity…';
+    _sseReceivedLines = false;
+    if (dot) dot.classList.remove('inactive');
+    if (msg) msg.textContent = 'Live';
   };
 
   _dashSSE.onmessage = e => {
@@ -2550,24 +3084,224 @@ function connectDashSSE() {
       const data = JSON.parse(e.data);
       if (data.heartbeat) return;
       if (data.line) {
-        const line = data.line;
-        // Only surface dispatcher lines to the live bar
-        if (line.includes('[Dispatcher]')) {
-          if (msg) msg.textContent = line.replace('[Dispatcher] ', '');
-          // Refresh decisions after a cycle completes
-          if (line.includes('Cycle complete') || line.includes('decisions_made')) {
-            setTimeout(loadDashboardDecisions, 500);
-          }
+        _sseReceivedLines = true;
+        appendChatLine(data.line);
+        // Refresh decision feed after a cycle finishes
+        if (/Cycle complete|assign_ticket/.test(data.line)) {
+          setTimeout(loadDashboardDecisions, 800);
+        }
+      }
+      if (data.done) {
+        if (dot) dot.classList.add('inactive');
+        if (msg) msg.textContent = 'Idle';
+        // Only refresh decisions if a real run just completed (not an idle reconnect)
+        if (_sseReceivedLines) {
+          setTimeout(loadDashboardDecisions, 800);
         }
       }
     } catch (_) {}
   };
 
   _dashSSE.onerror = () => {
-    if (dot) dot.classList.add('inactive');
-    if (msg) msg.textContent = 'Disconnected — will reconnect on next poll';
-    // SSE errors are non-fatal; polling still refreshes the feed
+    if (msg) msg.textContent = 'Reconnecting…';
   };
+}
+
+function appendChatLine(line) {
+  const chat = document.getElementById('agent-chat');
+  if (!chat) return;
+  const el = buildChatEl(line);
+  if (!el) return;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// Lines that are pure polling noise — silently dropped from the chat
+const _CHAT_MUTE = [
+  /No new tickets to dispatch/,
+  /─── Starting dispatch cycle ───/,
+  /ticket\(s\) found — all already processed/,
+  /Reached max_iterations/,
+];
+
+function buildChatEl(line) {
+  // Drop noisy polling chatter
+  if (_CHAT_MUTE.some(re => re.test(line))) return null;
+
+  // ── Separator line (─────) ─────────────────────────────────────────────────
+  if (/^─{10,}/.test(line)) {
+    const d = document.createElement('div');
+    d.className = 'ac-divider';
+    d.textContent = '─'.repeat(40);
+    _lastToolEl = null;
+    return d;
+  }
+
+  // ── Ticket header ──────────────────────────────────────────────────────────
+  const mTicket = line.match(/\[Agent\] Dispatching ticket #(\d+): (.+)/);
+  if (mTicket) {
+    _lastSysLine = null;
+    const d = document.createElement('div');
+    d.className = 'ac-ticket';
+    d.innerHTML = `<span class="ac-tid">Ticket #${esc(mTicket[1])}</span>  <span class="ac-tsum">${esc(mTicket[2])}</span>`;
+    return d;
+  }
+
+  // ── Model / dry_run meta ───────────────────────────────────────────────────
+  if (line.startsWith('[Agent] Model:')) {
+    const d = document.createElement('div');
+    d.className = 'ac-ticket';
+    d.innerHTML = `<span class="ac-tmeta">${esc(line.replace('[Agent] ', ''))}</span>`;
+    return d;
+  }
+
+  // ── Iteration badge ────────────────────────────────────────────────────────
+  const mIter = line.match(/\[Agent\] Iteration (\d+)\/(\d+)/);
+  if (mIter) {
+    const d = document.createElement('div');
+    d.className = 'ac-iter';
+    d.textContent = `· iteration ${mIter[1]} of ${mIter[2]}`;
+    return d;
+  }
+
+  // ── Claude text ────────────────────────────────────────────────────────────
+  if (line.startsWith('[Claude] ')) {
+    _lastSysLine = null;
+    const d = document.createElement('div');
+    d.className = 'ac-claude';
+    d.textContent = line.slice(9);
+    _lastToolEl = null;
+    return d;
+  }
+
+  // ── Tool call (>> tool_name({...})) ───────────────────────────────────────
+  const mTool = line.match(/^>> (\w+)\((.*)$/);
+  if (mTool) {
+    const d = document.createElement('div');
+    d.className = 'ac-tool';
+    d.innerHTML = `<span class="ac-tool-name">▶ ${esc(mTool[1])}</span>` +
+      (mTool[2] ? `<div class="ac-tool-input">${esc(mTool[2])}</div>` : '');
+    _lastToolEl = d;
+    return d;
+  }
+
+  // ── Tool result (<< ...) ─────────────────────────────────────────────────
+  if (line.startsWith('<< ')) {
+    const resultText = line.slice(3);
+    const d = document.createElement('div');
+    d.className = 'ac-result';
+    d.innerHTML = `<span class="ac-result-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'▾ result':'▸ result'">▸ result</span>` +
+      `<div class="ac-result-body">${esc(resultText)}</div>`;
+    _lastToolEl = null;
+    return d;
+  }
+
+  // ── Error ─────────────────────────────────────────────────────────────────
+  if (line.includes('✗') || line.includes('raised:') || line.startsWith('[Agent] ✗')) {
+    const d = document.createElement('div');
+    d.className = 'ac-error';
+    d.textContent = line;
+    return d;
+  }
+
+  // ── Done / complete ────────────────────────────────────────────────────────
+  if (line.includes('✓ Complete') || line.startsWith('[Agent] Done')) {
+    const d = document.createElement('div');
+    d.className = 'ac-done';
+    d.textContent = '✓ ' + line.replace(/^\[Agent\] /, '');
+    return d;
+  }
+
+  // ── Dispatcher / Agent system messages — deduplicate consecutive repeats ───
+  if (line.startsWith('[Dispatcher]') || line.startsWith('[Agent]')) {
+    if (line === _lastSysLine) return null;   // same line again — skip
+    _lastSysLine = line;
+    const d = document.createElement('div');
+    d.className = 'ac-sys';
+    d.textContent = line;
+    return d;
+  }
+
+  // ── Fallback: plain dim text — also deduplicated ───────────────────────────
+  if (line === _lastSysLine) return null;
+  _lastSysLine = line;
+  const d = document.createElement('div');
+  d.className = 'ac-sys';
+  d.textContent = line;
+  return d;
+}
+
+function clearAgentChat() {
+  const chat = document.getElementById('agent-chat');
+  if (chat) chat.innerHTML = '';
+  _lastToolEl = null;
+}
+
+async function loadLatestTrace() {
+  const chat = document.getElementById('agent-chat');
+  if (!chat) return;
+
+  const rows = await api('GET', '/api/dispatch/traces?limit=1');
+  if (!rows || rows.error || !rows.length) {
+    toast('No recorded traces found', 'warn');
+    return;
+  }
+  const rec = await api('GET', `/api/dispatch/traces/${rows[0].id}`);
+  if (!rec || rec.error) { toast('Failed to load trace', 'err'); return; }
+
+  chat.innerHTML = '';
+  _lastToolEl = null;
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'ac-ticket';
+  hdr.innerHTML = `<span class="ac-tid">Trace #${rec.id} — Ticket #${rec.ticket_id}</span>  <span class="ac-tsum">${esc(rec.ticket_summary || '')}</span>` +
+    `<div class="ac-tmeta">${rec.status} · ${rec.iterations} iterations · ${rec.elapsed_seconds != null ? rec.elapsed_seconds.toFixed(1)+'s' : '?'} · ${new Date(rec.created_at).toLocaleString()}</div>`;
+  chat.appendChild(hdr);
+
+  for (const ev of (rec.trace || [])) {
+    const el = buildTraceEl(ev);
+    if (el) chat.appendChild(el);
+  }
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function buildTraceEl(ev) {
+  if (ev.type === 'text') {
+    const d = document.createElement('div');
+    d.className = 'ac-claude';
+    d.textContent = ev.text;
+    return d;
+  }
+  if (ev.type === 'tool_call') {
+    const inputStr = JSON.stringify(ev.input || {}, null, 2);
+    const resultStr = JSON.stringify(ev.result || ev.error || {}, null, 2);
+    const wrap = document.createElement('div');
+    const toolEl = document.createElement('div');
+    toolEl.className = 'ac-tool';
+    toolEl.innerHTML = `<span class="ac-tool-name">▶ ${esc(ev.tool)}</span>` +
+      `<div class="ac-tool-input">${esc(inputStr.length > 300 ? inputStr.slice(0,300)+'…' : inputStr)}</div>`;
+    const resEl = document.createElement('div');
+    resEl.className = 'ac-result';
+    resEl.innerHTML = `<span class="ac-result-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'▾ result':'▸ result'">▸ result</span>` +
+      `<div class="ac-result-body">${esc(resultStr.length > 800 ? resultStr.slice(0,800)+'…' : resultStr)}</div>`;
+    wrap.appendChild(toolEl);
+    wrap.appendChild(resEl);
+    return wrap;
+  }
+  if (ev.type === 'done') {
+    const d = document.createElement('div');
+    d.className = 'ac-done';
+    d.textContent = `✓ ${ev.stop_reason} — ${ev.iterations} iteration(s) — ${ev.elapsed}s`;
+    return d;
+  }
+  if (ev.type === 'error') {
+    const d = document.createElement('div');
+    d.className = 'ac-error';
+    d.textContent = ev.error;
+    return d;
+  }
+  return null;
 }
 
 // ── Section 2: Tech Overview ──────────────────────────────────────────────────
@@ -2588,24 +3322,31 @@ async function loadDashboardTechs() {
       }
     }
 
-    const workload = (metrics && metrics.assignments_by_tech) ? metrics.assignments_by_tech : {};
-
     if (!Array.isArray(members) || members.length === 0) {
       document.getElementById('dash-techs').innerHTML =
         '<div class="empty-state" style="padding:20px">No technicians found.</div>';
       return;
     }
 
-    // Sort by workload descending
-    const sorted = [...members].sort((a, b) => {
-      const wa = workload[a.technician] || 0;
-      const wb = workload[b.technician] || 0;
-      return wb - wa;
-    });
+    // Only show active technicians
+    const activeMembers = members.filter(m => m.is_active !== false);
+    if (activeMembers.length === 0) {
+      document.getElementById('dash-techs').innerHTML =
+        '<div class="empty-state" style="padding:20px">No active technicians. Mark members as active in the Members tab.</div>';
+      return;
+    }
 
-    const maxWork = Math.max(1, ...Object.values(workload));
+    // Render immediately with zero counts, then patch in real CW counts async
+    const sorted = [...activeMembers].sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '')
+    );
+
+    // Subtitle update
+    const subtitle = document.querySelector('#dash-techs')?.closest('.card')?.querySelector('.card-subtitle');
+    if (subtitle) subtitle.textContent = '(open tickets — loading…)';
 
     document.getElementById('dash-techs').innerHTML = sorted.map(m => {
+      const nameKey  = esc(m.name);
       const initials = (m.name || m.technician || '?')
         .split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
 
@@ -2622,45 +3363,220 @@ async function loadDashboardTechs() {
         }
       }
 
-      const count = workload[m.technician] || 0;
-      const pct   = maxWork > 0 ? Math.round(count / maxWork * 100) : 0;
-      const wlClass = pct >= 75 ? 'wl-high' : pct >= 40 ? 'wl-med' : 'wl-low';
+      const ident = esc(m.technician || m.name);
 
-      const skillsStr      = (m.skills      || []).join(', ') || '—';
-      const specialtiesStr = (m.specialties || []).join(', ') || '—';
+      const skillTagsHtml = buildTagsHtml(m.skills || []);
+      const specTagsHtml  = buildTagsHtml(m.specialties || []);
 
       return `
-      <div class="tech-card" onclick="toggleTechCard(this)">
+      <div class="tech-card" data-ident="${ident}" onclick="toggleTechCard(event, this)">
         <div class="tech-card-header">
           <div class="tech-avatar">${esc(initials)}</div>
           <div class="tech-info">
             <div class="tech-name">${esc(m.name || m.technician)}</div>
             ${presHtml}
           </div>
-          <div class="tech-count" style="color:${pct>=75?'var(--red)':pct>=40?'var(--yellow)':'var(--text)'}">${count}</div>
+          <div class="tech-count" data-name="${esc(m.name)}" style="color:var(--text)">—</div>
         </div>
         <div class="workload-bar">
-          <div class="workload-fill ${wlClass}" style="width:${pct}%"></div>
+          <div class="workload-fill wl-low" data-name="${esc(m.name)}" style="width:0%"></div>
         </div>
         <div class="tech-details">
-          <div class="tech-detail-row">Skills: <span class="tech-detail-val">${esc(skillsStr)}</span></div>
-          <div class="tech-detail-row">Specialties: <span class="tech-detail-val">${esc(specialtiesStr)}</span></div>
+          <div class="tech-tags-section" data-field="skills">
+            <div class="tech-tags-label">
+              Skills
+              <span>
+                <button class="tech-edit-btn" onclick="startEditTags(event,this)">Edit</button>
+                <button class="tech-save-btn" onclick="saveTagField(event,this,'${ident}','skills')">Save</button>
+              </span>
+            </div>
+            <div class="tech-tags-wrap">
+              ${skillTagsHtml}
+              <input class="tech-tag-input" type="text" placeholder="add skill, press Enter">
+            </div>
+          </div>
+          <div class="tech-tags-section" data-field="specialties">
+            <div class="tech-tags-label">
+              Specialties
+              <span>
+                <button class="tech-edit-btn" onclick="startEditTags(event,this)">Edit</button>
+                <button class="tech-save-btn" onclick="saveTagField(event,this,'${ident}','specialties')">Save</button>
+              </span>
+            </div>
+            <div class="tech-tags-wrap">
+              ${specTagsHtml}
+              <input class="tech-tag-input" type="text" placeholder="add specialty, press Enter">
+            </div>
+          </div>
           ${m.avg_resolution_minutes != null
             ? `<div class="tech-detail-row">Avg resolution: <span class="tech-detail-val">${Math.round(m.avg_resolution_minutes)} min</span></div>` : ''}
           ${m.total_tickets_handled
             ? `<div class="tech-detail-row">Total handled: <span class="tech-detail-val">${m.total_tickets_handled}</span></div>` : ''}
+          <div class="tech-schedule">
+            <div class="tech-schedule-title">Schedule (next 3 days)</div>
+            <div class="tech-sched-entries"><span class="tech-sched-loading">Loading…</span></div>
+          </div>
         </div>
       </div>`;
     }).join('');
+
+    // Async: patch in real CW open-ticket counts without blocking the render
+    fetchAndPatchWorkload();
+
   } catch (err) {
     document.getElementById('dash-techs').innerHTML =
       `<div class="empty-state" style="padding:20px">Error loading techs.</div>`;
   }
 }
 
-function toggleTechCard(card) {
+async function fetchAndPatchWorkload() {
+  try {
+    const data = await fetch('/api/members/workload').then(r => r.json());
+    const counts = data.counts || {};
+    const total  = data.total_open || 0;
+
+    // Patch each tech card's count badge and workload bar
+    document.querySelectorAll('.tech-count[data-name]').forEach(el => {
+      const name  = el.dataset.name;
+      const count = counts[name] ?? 0;
+      const pct   = total > 0 ? Math.min(100, Math.round((count / total) * 100 * 4)) : 0;
+      // colour thresholds: ≥10 tickets = red, ≥5 = yellow
+      el.textContent = count;
+      el.style.color  = count >= 10 ? 'var(--red)' : count >= 5 ? 'var(--yellow)' : 'var(--text)';
+
+      const bar = document.querySelector(`.workload-fill[data-name="${CSS.escape(name)}"]`);
+      if (bar) {
+        bar.style.width = pct + '%';
+        bar.className = 'workload-fill ' + (count >= 10 ? 'wl-high' : count >= 5 ? 'wl-mid' : 'wl-low');
+      }
+    });
+
+    // Update subtitle
+    const cached = data.cached ? ' · cached' : '';
+    const subtitle = document.querySelector('#dash-techs')?.closest('.card')?.querySelector('.card-subtitle');
+    if (subtitle) subtitle.textContent = `(${total} open tickets${cached})`;
+
+  } catch (e) {
+    // Silently fail — counts stay as "—"
+    const subtitle = document.querySelector('#dash-techs')?.closest('.card')?.querySelector('.card-subtitle');
+    if (subtitle) subtitle.textContent = '(open tickets — unavailable)';
+  }
+}
+
+function buildTagsHtml(tags) {
+  if (!tags || tags.length === 0) return '<span class="tech-tag-empty">None</span>';
+  return tags.map(t => `
+    <span class="tech-tag">
+      ${esc(t)}
+      <span class="tech-tag-remove" onclick="removeTechTag(event,this)">×</span>
+    </span>`).join('');
+}
+
+function toggleTechCard(event, card) {
+  // Don't toggle when clicking inside buttons/inputs
+  if (event.target.closest('button, input')) return;
   const details = card.querySelector('.tech-details');
-  if (details) details.style.display = details.style.display === 'block' ? 'none' : 'block';
+  if (!details) return;
+  const opening = details.style.display !== 'block';
+  details.style.display = opening ? 'block' : 'none';
+  if (opening) {
+    const ident = card.dataset.ident;
+    const schedContainer = card.querySelector('.tech-sched-entries');
+    if (schedContainer && schedContainer.querySelector('.tech-sched-loading')) {
+      loadTechSchedule(ident, schedContainer);
+    }
+  }
+}
+
+async function loadTechSchedule(ident, container) {
+  try {
+    const r = await fetch(`/api/members/${encodeURIComponent(ident)}/schedule?days_ahead=3`);
+    const data = await r.json();
+    if (data.error) {
+      container.innerHTML = `<span class="tech-sched-empty">${esc(data.error)}</span>`;
+      return;
+    }
+    const entries = data.entries || [];
+    if (entries.length === 0) {
+      container.innerHTML = '<span class="tech-sched-empty">No scheduled entries in the next 3 days.</span>';
+      return;
+    }
+    container.innerHTML = entries.map(e => {
+      const start = e.date_start ? e.date_start.slice(0, 16).replace('T', ' ') : '—';
+      const dur   = e.duration_hours != null ? `${e.duration_hours}h` : '';
+      const subj  = e.subject || e.type || 'Entry';
+      return `<div class="tech-schedule-entry">
+        <span class="tech-sched-time">${esc(start)}</span>
+        <span class="tech-sched-subject">${esc(subj)}</span>
+        <span class="tech-sched-dur">${esc(dur)}</span>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = '<span class="tech-sched-empty">Could not load schedule.</span>';
+  }
+}
+
+function startEditTags(event, btn) {
+  event.stopPropagation();
+  const section = btn.closest('.tech-tags-section');
+  section.classList.add('editing');
+  const input = section.querySelector('.tech-tag-input');
+  input.focus();
+  input.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Enter' && input.value.trim()) {
+      e.preventDefault();
+      addTechTag(section, input.value.trim());
+      input.value = '';
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      section.classList.remove('editing');
+      input.removeEventListener('keydown', onKey);
+    }
+  });
+}
+
+function addTechTag(section, value) {
+  const wrap = section.querySelector('.tech-tags-wrap');
+  const empty = wrap.querySelector('.tech-tag-empty');
+  if (empty) empty.remove();
+  const tag = document.createElement('span');
+  tag.className = 'tech-tag';
+  tag.innerHTML = `${esc(value)}<span class="tech-tag-remove" onclick="removeTechTag(event,this)">×</span>`;
+  wrap.insertBefore(tag, wrap.querySelector('.tech-tag-input'));
+}
+
+function removeTechTag(event, btn) {
+  event.stopPropagation();
+  const tag = btn.closest('.tech-tag');
+  const wrap = tag.parentElement;
+  tag.remove();
+  if (!wrap.querySelectorAll('.tech-tag').length) {
+    const empty = document.createElement('span');
+    empty.className = 'tech-tag-empty';
+    empty.textContent = 'None';
+    wrap.insertBefore(empty, wrap.querySelector('.tech-tag-input'));
+  }
+}
+
+async function saveTagField(event, btn, ident, field) {
+  event.stopPropagation();
+  const section = btn.closest('.tech-tags-section');
+  const tags = Array.from(section.querySelectorAll('.tech-tag')).map(t => {
+    // text content without the × button text
+    return t.childNodes[0].textContent.trim();
+  }).filter(Boolean);
+  try {
+    const r = await api('PUT', `/api/members/${encodeURIComponent(ident)}`, { [field]: tags });
+    if (r.ok !== false) {
+      section.classList.remove('editing');
+      toast(`${field} saved`);
+    } else {
+      toast(`Save failed`, 'err');
+    }
+  } catch {
+    toast('Save failed', 'err');
+  }
 }
 
 // ── Section 3: Metrics ────────────────────────────────────────────────────────
@@ -2796,6 +3712,206 @@ async function dispatcherRunOnce() {
   toast('Dispatch cycle triggered');
   setTimeout(() => { loadDispatcherStatus(); loadDispatcherHistory(); }, 2000);
 }
+
+// ── Trace Viewer ─────────────────────────────────────────────────────────────
+
+async function loadTraces() {
+  const list = document.getElementById('trace-list');
+  const rows = await api('GET', '/api/dispatch/traces?limit=50');
+  if (!rows || rows.error) { list.innerHTML = `<div class="empty-state">Failed to load traces.</div>`; return; }
+  if (!rows.length) { list.innerHTML = `<div class="empty-state">No traces yet. Run a dispatch to see the reasoning log.</div>`; return; }
+  list.innerHTML = rows.map(r => {
+    const st = r.status === 'ok' ? '<span class="sb-ok">ok</span>'
+             : r.status === 'error' ? '<span class="sb-error">error</span>'
+             : `<span class="sb-timeout">${esc(r.status)}</span>`;
+    const ts = new Date(r.created_at).toLocaleString();
+    const dry = r.was_dry_run ? '<span style="color:var(--purple);font-size:10px">dry</span>' : '';
+    return `<div class="trace-row" onclick="openTrace(${r.id}, '${esc(r.ticket_summary||'')}')">
+      <span class="tr-id">#${r.id}</span>
+      <span class="tr-tid">T-${r.ticket_id}</span>
+      <span class="tr-sum">${esc(r.ticket_summary || '—')}</span>
+      ${dry}
+      <span class="tr-st">${st} &middot; ${r.iterations}it &middot; ${r.elapsed_seconds != null ? r.elapsed_seconds.toFixed(1)+'s' : '—'}</span>
+      <span class="tr-ts">${ts}</span>
+    </div>`;
+  }).join('');
+}
+
+async function openTrace(id, summary) {
+  const detail = document.getElementById('trace-detail');
+  const events = document.getElementById('trace-events');
+  const title  = document.getElementById('trace-detail-title');
+  detail.className = 'open';
+  events.innerHTML = '<span style="color:var(--muted)">Loading…</span>';
+  title.textContent = `Trace #${id}${summary ? ' — ' + summary : ''}`;
+  detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const r = await api('GET', `/api/dispatch/traces/${id}`);
+  if (r.error) { events.innerHTML = `<div class="trace-event ev-error">${esc(r.error)}</div>`; return; }
+  events.innerHTML = renderTrace(r.trace || []);
+}
+
+function closeTrace() {
+  document.getElementById('trace-detail').className = '';
+}
+
+function renderTrace(trace) {
+  return trace.map((ev, i) => {
+    const t = ev.t != null ? `<span style="color:var(--muted);float:right;font-size:10px">${ev.t.toFixed(2)}s</span>` : '';
+    if (ev.type === 'text') {
+      return `<div class="trace-event ev-text">${t}<strong style="color:var(--accent);font-size:10px">CLAUDE (iter ${ev.iteration})</strong><br>${esc(ev.text)}</div>`;
+    }
+    if (ev.type === 'tool_call') {
+      const inputJson  = JSON.stringify(ev.input  || {}, null, 2);
+      const resultJson = JSON.stringify(ev.result || ev.error || {}, null, 2);
+      return `<div class="trace-event ev-call">
+        ${t}
+        <span class="ev-name">&gt;&gt; ${esc(ev.tool)}</span>
+        <div class="ev-input">${esc(inputJson)}</div>
+      </div>
+      <div class="trace-event ev-result">
+        <span class="ev-result-toggle" onclick="toggleResult(this)">&#9654; Result</span>
+        <div class="ev-result-body">${esc(resultJson)}</div>
+      </div>`;
+    }
+    if (ev.type === 'done') {
+      return `<div class="trace-event ev-done">${t}Done — ${ev.stop_reason} | ${ev.iterations} iteration(s) | ${ev.elapsed}s</div>`;
+    }
+    if (ev.type === 'error') {
+      return `<div class="trace-event ev-error">${t}Error: ${esc(ev.error)}</div>`;
+    }
+    return '';
+  }).join('');
+}
+
+function toggleResult(el) {
+  const body = el.nextElementSibling;
+  const open = body.classList.toggle('open');
+  el.textContent = open ? '\u25BE Result' : '\u25B6 Result';
+}
+
+// ── Operator Notes ─────────────────────────────────────────────────────────
+
+let _pendingNote = null;
+
+async function loadNotes() {
+  const includeExpired = document.getElementById('notes-show-expired')?.checked;
+  const url = '/api/notes' + (includeExpired ? '?include_expired=true' : '');
+  const notes = await api('GET', url);
+  const list = document.getElementById('notes-list');
+  const badge = document.getElementById('notes-count-badge');
+  if (!Array.isArray(notes)) {
+    list.innerHTML = '<div style="color:var(--red);font-size:13px">Failed to load notes</div>';
+    return;
+  }
+  badge.textContent = notes.length;
+  if (notes.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">No active operator instructions.</div>';
+    return;
+  }
+  list.innerHTML = notes.map(n => renderNoteCard(n)).join('');
+}
+
+function renderNoteCard(n) {
+  const scopeColors = { global:'var(--red)', client:'var(--accent)', tech:'var(--yellow)', incident:'var(--purple)' };
+  const scopeColor = scopeColors[n.scope] || 'var(--muted)';
+  const scopeLabel = n.scope === 'global' ? 'GLOBAL'
+                   : n.scope === 'client' ? `CLIENT: ${n.scope_ref || '?'}`
+                   : n.scope === 'tech'   ? `TECH: ${n.scope_ref || '?'}`
+                   : n.scope === 'incident' ? `INCIDENT: ${n.scope_ref || '?'}`
+                   : n.scope.toUpperCase();
+  const expiresStr = n.expires_at
+    ? `Expires ${new Date(n.expires_at).toLocaleString()}`
+    : 'Never (manual delete)';
+  const tagsHtml = (n.tags || []).map(t =>
+    `<span style="background:var(--card2);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:11px">${esc(t)}</span>`
+  ).join(' ');
+  const createdAt = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+
+  return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:12px" id="note-card-${n.id}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="background:${scopeColor}22;color:${scopeColor};border:1px solid ${scopeColor}55;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600">${esc(scopeLabel)}</span>
+      <span style="font-size:11px;color:var(--muted)">${esc(expiresStr)}</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:auto">Added ${esc(createdAt)}</span>
+    </div>
+    <div style="font-size:13px;color:var(--text);margin-bottom:8px">${esc(n.note_text)}</div>
+    ${tagsHtml ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">${tagsHtml}</div>` : ''}
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-secondary btn-sm" onclick="deleteNote(${n.id})">✕ Delete</button>
+    </div>
+  </div>`;
+}
+
+async function sendNoteChat() {
+  const input = document.getElementById('notes-chat-input');
+  const message = input.value.trim();
+  if (!message) return;
+
+  const btn = document.getElementById('notes-chat-btn');
+  btn.disabled = true;
+  btn.textContent = 'Parsing…';
+
+  try {
+    const result = await api('POST', '/api/notes/chat', { message });
+    if (result.error) {
+      toast(result.error, 'error');
+      return;
+    }
+    _pendingNote = result;
+    const preview = document.getElementById('notes-chat-preview');
+    const interp  = document.getElementById('notes-chat-interp');
+    const conf = result.confidence != null ? ` (confidence: ${(result.confidence * 100).toFixed(0)}%)` : '';
+    interp.innerHTML = `<strong>${esc(result.interpretation || '')}${esc(conf)}</strong><br>
+      <span style="color:var(--muted);font-size:12px">Note: "${esc(result.note?.note_text || '')}" | Scope: ${esc(result.note?.scope || '')}${result.note?.scope_ref ? ` → ${esc(result.note.scope_ref)}` : ''} | Expires: ${result.note?.expires_at ? new Date(result.note.expires_at).toLocaleString() : 'Never'}</span>`;
+    preview.style.display = 'block';
+    // Note is already saved by the chat endpoint — show it immediately
+    loadNotes();
+    input.value = '';
+    toast('Note created — see interpretation above', 'ok');
+  } catch(e) {
+    toast('Error: ' + e, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send';
+  }
+}
+
+function confirmNote() {
+  document.getElementById('notes-chat-preview').style.display = 'none';
+  _pendingNote = null;
+  toast('Note saved', 'ok');
+}
+
+function cancelNote() {
+  if (_pendingNote?.note?.id) {
+    api('DELETE', '/api/notes/' + _pendingNote.note.id).then(() => loadNotes());
+  }
+  document.getElementById('notes-chat-preview').style.display = 'none';
+  _pendingNote = null;
+}
+
+async function deleteNote(id) {
+  if (!confirm('Delete this operator note?')) return;
+  const r = await api('DELETE', '/api/notes/' + id);
+  if (r.ok) { toast('Note deleted', 'ok'); loadNotes(); }
+  else toast(r.error || 'Delete failed', 'error');
+}
+
+let _briefingVisible = false;
+function toggleBriefing() {
+  _briefingVisible = !_briefingVisible;
+  document.getElementById('briefing-content').style.display = _briefingVisible ? 'block' : 'none';
+  document.getElementById('briefing-toggle-icon').textContent = _briefingVisible ? '▼ Hide' : '▶ Show';
+  if (_briefingVisible) loadBriefing();
+}
+
+async function loadBriefing() {
+  const el = document.getElementById('briefing-text');
+  el.textContent = 'Loading…';
+  const r = await api('GET', '/api/notes/briefing');
+  el.textContent = r.briefing || '(empty)';
+}
+
 </script>
 </body>
 </html>

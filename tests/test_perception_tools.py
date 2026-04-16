@@ -293,9 +293,12 @@ class TestGetTechnicianWorkload:
     def test_single_tech_open_ticket_count(self, mock_cw_client, mock_mappings):
         from src.tools.perception.technicians import get_technician_workload
 
+        # Tickets must have owner.id so the local filter correctly attributes them
         mock_cw_client.fetch_all_tickets.return_value = [
-            {"id": 1, "priority": {"name": "High"}, "dateEntered": "2024-01-10T09:00:00Z"},
-            {"id": 2, "priority": {"name": "Medium"}, "dateEntered": "2024-01-12T09:00:00Z"},
+            {"id": 1, "priority": {"name": "High"}, "dateEntered": "2024-01-10T09:00:00Z",
+             "owner": {"id": 200}},
+            {"id": 2, "priority": {"name": "Medium"}, "dateEntered": "2024-01-12T09:00:00Z",
+             "owner": {"id": 200}},
         ]
 
         result = get_technician_workload(mock_cw_client, mock_mappings, member_id=200)
@@ -305,32 +308,47 @@ class TestGetTechnicianWorkload:
         assert result["by_priority"]["High"] == 1
         assert result["by_priority"]["Medium"] == 1
         assert result["oldest_ticket_age_hours"] is not None
+        assert "workload_threshold" in result
+        assert "total_open_tickets" in result
+        assert result["total_open_tickets"] == 2
 
     def test_overloaded_flag_set_above_threshold(self, mock_cw_client, mock_mappings):
         from src.tools.perception.technicians import get_technician_workload
 
+        # 10 total open tickets: 5 owned by tech 200, 5 by others.
+        # threshold = ceil(10 * 0.40) = 4. Tech has 5 → overloaded.
         mock_cw_client.fetch_all_tickets.return_value = [
-            {"id": i, "priority": {"name": "Low"}, "dateEntered": "2024-01-10T09:00:00Z"}
-            for i in range(6)
+            {"id": i, "priority": {"name": "Low"}, "dateEntered": "2024-01-10T09:00:00Z",
+             "owner": {"id": 200}}
+            for i in range(5)
+        ] + [
+            {"id": i + 100, "priority": {"name": "Low"}, "dateEntered": "2024-01-10T09:00:00Z",
+             "owner": {"id": 201}}
+            for i in range(5)
         ]
 
-        result = get_technician_workload(
-            mock_cw_client, mock_mappings, member_id=200, max_workload_threshold=5
-        )
+        result = get_technician_workload(mock_cw_client, mock_mappings, member_id=200)
         assert result["overloaded"] is True
+        assert result["workload_threshold"] == 4   # ceil(10 * 0.40)
 
     def test_overloaded_flag_clear_below_threshold(self, mock_cw_client, mock_mappings):
         from src.tools.perception.technicians import get_technician_workload
 
+        # 10 total open tickets: 2 owned by tech 200, 8 by others.
+        # threshold = ceil(10 * 0.40) = 4. Tech has 2 → not overloaded.
         mock_cw_client.fetch_all_tickets.return_value = [
-            {"id": i, "priority": {"name": "Low"}, "dateEntered": "2024-01-10T09:00:00Z"}
-            for i in range(3)
+            {"id": i, "priority": {"name": "Low"}, "dateEntered": "2024-01-10T09:00:00Z",
+             "owner": {"id": 200}}
+            for i in range(2)
+        ] + [
+            {"id": i + 100, "priority": {"name": "Low"}, "dateEntered": "2024-01-10T09:00:00Z",
+             "owner": {"id": 201}}
+            for i in range(8)
         ]
 
-        result = get_technician_workload(
-            mock_cw_client, mock_mappings, member_id=200, max_workload_threshold=5
-        )
+        result = get_technician_workload(mock_cw_client, mock_mappings, member_id=200)
         assert result["overloaded"] is False
+        assert result["workload_threshold"] == 4   # ceil(10 * 0.40)
 
     def test_all_techs_mode_returns_techs_list(self, mock_cw_client, mock_mappings):
         """all_techs=True fetches all open tickets once and groups by owner."""

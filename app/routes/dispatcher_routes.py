@@ -102,7 +102,7 @@ def dispatcher_decisions():
                 result.append({
                     "id":            r.id,
                     "ticket_id":     r.ticket_id,
-                    "ticket_summary": (r.ticket_summary or "")[:80],
+                    "ticket_summary": r.ticket_summary or "",
                     "assigned_to":   r.assigned_tech_identifier,
                     "reason":        r.reason,
                     "confidence":    r.confidence,

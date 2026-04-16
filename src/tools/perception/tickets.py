@@ -230,7 +230,7 @@ def get_single_ticket_history(
                 for a in raw_audit
             ][:30]
         except Exception as exc:
-            log.warning("Audit trail unavailable for ticket %s: %s", ticket_id, exc)
+            log.debug("Audit trail unavailable for ticket %s: %s", ticket_id, exc)
 
     return {
         "ticket_id":    ticket_id,

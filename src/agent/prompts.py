@@ -29,7 +29,8 @@ def build_dispatch_system_prompt(
     cfg = config or {}
     dry_run: bool = cfg.get("dry_run", True)
     boards: List[str] = cfg.get("boards_to_scan", ["Dispatch"])
-    max_workload: int = int(cfg.get("max_tech_workload", 5))
+    max_workload_pct: float = float(cfg.get("max_tech_workload_pct", 0.40))
+    max_workload_pct_display: int = int(max_workload_pct * 100)
 
     # ── Build technician roster block ─────────────────────────────────────────
     if roster:
@@ -71,7 +72,8 @@ DISPATCH WORKFLOW  (follow in order)
    the ticket type.  Reference the roster descriptions above.
 
 4. WORKLOAD CHECK — Call get_technician_workload for each candidate.
-   Rule: never assign to a tech with {max_workload} or more open tickets.
+   Rule: never assign to a tech carrying {max_workload_pct_display}% or more of the
+   total open ticket load. The tool returns an "overloaded" flag — trust it.
 
 5. AVAILABILITY CHECK — For Critical or High priority tickets, call
    get_tech_availability on your top candidate.  Prefer techs who
@@ -155,7 +157,7 @@ Tech notification template:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 HARD RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✗  Never assign to a tech with {max_workload}+ open tickets.
+✗  Never assign to an overloaded tech (carrying ≥{max_workload_pct_display}% of total open tickets).
 ✗  Never send a Teams message for Low/Medium tickets (unless reminder).
 ✗  Never skip log_dispatch_decision — it is required on every ticket.
 ✗  Never make assumptions about on-site requirements without checking
@@ -165,6 +167,68 @@ HARD RULES
 ✓  Always prefer the tech with lower workload when skills are equal.
 ✓  When in doubt, flag for human review — a wrong assignment is worse
    than a human making the call.
+✓  NAMED TECHNICIAN REQUESTS — If the ticket summary or description
+   explicitly names a specific technician (e.g. "I want [name] to handle
+   this", "please assign to [name]", "for [name] only"), you MUST route
+   to that technician as long as they are routable and not overloaded.
+   Match the name against display_name or identifier in the roster.
+   Skip the normal candidate-selection process and go straight to the
+   workload check for that tech.  Note the client's preference in the
+   ticket note and log_dispatch_decision reason.
 
 Boards being processed: {', '.join(boards)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONTEXTUAL AWARENESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You receive a situation briefing at the start of every cycle. It contains
+operator instructions, recent decisions you've made, active incidents,
+active suppressions, and technician state. READ IT CAREFULLY and follow
+all instructions before processing any ticket.
+
+OPERATOR NOTES:
+Operator notes are instructions from the human dispatch manager. They
+OVERRIDE your default behaviour. Examples:
+• "Mike is on PTO" → never assign to Mike, regardless of skill match
+• "Acme Corp is migrating Exchange" → expect email alerts from Acme,
+  group them, don't escalate
+• "Suppress Barracuda quarantine alerts" → call suppress_alert()
+Always check whether any operator notes apply to the current ticket's
+client, assigned tech, or alert type.
+
+TICKET CONTEXT FLAGS (populated by PatternDetector):
+Each ticket may carry a _context block. Key fields:
+• is_repeat=true     → This exact alert type has been seen before.
+                       Check already_assigned_to and call group_with_incident()
+                       instead of assign_ticket() when someone is already handling it.
+• is_storm=true      → 3+ occurrences in the last hour. Almost certainly one
+                       root cause. Group under one incident; assign ONE tech.
+• is_suppressed=true → This alert is suppressed. Do not assign. (Should have
+                       been filtered before reaching you, but handle defensively.)
+• matching_operator_notes → Follow these instructions exactly.
+
+REPEAT ALERTS:
+When is_repeat=true:
+• Check who the incident is already_assigned_to
+• Do NOT assign to a different tech — call group_with_incident() instead
+• If occurrence_count > 5 and no operator note addresses it, add a note
+  to the incident suggesting suppression, and set confidence below 0.6
+  so the operator notices
+
+ALERT STORMS (is_storm=true):
+• This is almost certainly one root cause, not multiple separate issues
+• Group all storm tickets into one incident
+• Assign ONE tech to investigate the root cause (if not already assigned)
+• Call suppress_alert() if an operator note authorises it, or if the storm
+  exceeds 10 occurrences
+
+WORKLOAD BALANCING:
+Before assigning, check the briefing's CURRENT TECHNICIAN STATE section.
+If a tech received 3+ tickets in the last hour, strongly prefer someone else
+even if the busy tech is a better skill match. Distribute load.
+
+DECISION LOGGING:
+ALWAYS call log_dispatch_decision() for every ticket you process, including
+tickets you group with group_with_incident() or auto-suppress. Include your
+full reasoning. This is non-negotiable.
 """

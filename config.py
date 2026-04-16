@@ -42,6 +42,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "add_routing_note":           True,
     "note_template":              "AI Routing: assigned to {display_name} \u2014 {reason}",
     "max_tickets_to_process":     50,
+    "max_tech_workload_pct":      0.40,
     "claude_model":               "claude-sonnet-4-6",
     "mappings_path":              str(DATA_DIR / "mappings.json"),
     "timeout_secs":               20,

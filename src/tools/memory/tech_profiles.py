@@ -25,18 +25,23 @@ def _member_id_from_mappings(mappings: Dict, identifier: str) -> Optional[int]:
 
 def _row_to_dict(tech, identifier: str | None = None) -> Dict[str, Any]:
     """Serialise a Technician ORM row to a plain dict."""
+    ident = identifier or tech.cw_identifier or tech.name
     return {
         "id":                      tech.id,
-        "technician":              identifier or tech.name,
+        "technician":              ident,
+        "cw_identifier":           tech.cw_identifier,
         "cw_member_id":            tech.cw_member_id,
         "name":                    tech.name,
         "email":                   tech.email,
         "teams_user_id":           tech.teams_user_id,
+        "routable":                bool(tech.routable) if tech.routable is not None else True,
+        "description":             tech.description or "",
         "skills":                  tech.skills,
         "specialties":             tech.specialties,
         "avg_resolution_minutes":  tech.avg_resolution_minutes,
         "total_tickets_handled":   tech.total_tickets_handled,
         "notes":                   tech.notes,
+        "is_active":               bool(tech.is_active) if tech.is_active is not None else True,
         "created_at":              tech.created_at.isoformat() if tech.created_at else None,
         "updated_at":              tech.updated_at.isoformat() if tech.updated_at else None,
     }
@@ -107,28 +112,34 @@ def update_tech_profile(
     identifier: str,
     updates: Dict[str, Any],
     mappings: Dict | None = None,
+    cw_member_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Partial-update (or create) a technician's profile in SQLite.
 
     Accepted update keys:
-        skills, specialties, notes, email, teams_user_id,
-        avg_resolution_minutes, total_tickets_handled
+        name, skills, specialties, notes, email, teams_user_id,
+        avg_resolution_minutes, total_tickets_handled, is_active
 
     Args:
-        identifier: CW login identifier
-        updates:    Dict of fields to set
-        mappings:   Full mappings dict
+        identifier:    CW login identifier
+        updates:       Dict of fields to set
+        mappings:      Full mappings dict (used as fallback for cw_member_id)
+        cw_member_id:  Explicit CW member ID — skips mappings lookup when provided
 
     Returns:
         {"ok": True, "technician": identifier, "updated": [...field names]}
     """
     mappings = mappings or {}
-    member_id = _member_id_from_mappings(mappings, identifier)
+    # Prefer the explicitly supplied cw_member_id over the mappings lookup so
+    # we always hit the correct row even when mappings are mid-save.
+    member_id = cw_member_id if cw_member_id is not None else _member_id_from_mappings(mappings, identifier)
 
     UPDATABLE = {
+        "name", "cw_identifier", "routable", "description",
         "skills", "specialties", "notes", "email",
         "teams_user_id", "avg_resolution_minutes", "total_tickets_handled",
+        "is_active",
     }
 
     try:
@@ -141,11 +152,27 @@ def update_tech_profile(
                 tech = session.query(Technician).filter_by(cw_member_id=member_id).first()
 
             if tech is None:
-                roster = mappings.get("agent_routing") or {}
-                info = roster.get(identifier) or {}
+                # Fall back to lookup by cw_identifier, then by name
+                tech = (
+                    session.query(Technician)
+                    .filter(Technician.cw_identifier == identifier)
+                    .first()
+                )
+
+            if tech is None:
+                tech = (
+                    session.query(Technician)
+                    .filter(Technician.name.ilike(identifier))
+                    .first()
+                )
+
+            if tech is None:
+                # Create a new row; name comes from the updates payload itself
+                # (the caller always includes it), falling back to the identifier.
+                initial_name = updates.get("name") or identifier
                 tech = Technician(
                     cw_member_id=member_id,
-                    name=info.get("display_name", identifier),
+                    name=initial_name,
                 )
                 session.add(tech)
 

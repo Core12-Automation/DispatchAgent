@@ -270,64 +270,106 @@ class DispatcherService:
 
         self._broadcast(f"[Dispatcher] {len(new_tickets)} new ticket(s) to dispatch")
 
+        # ── Mark all IDs processed immediately ────────────────────────────────
+        for t in new_tickets:
+            tid = t.get("id")
+            if tid is not None:
+                with self._lock:
+                    self._processed_ids.add(tid)
+
+        # ── Pre-process via PatternDetector ───────────────────────────────────
+        try:
+            from src.tools.perception.pattern_detector import PatternDetector
+            detector = PatternDetector()
+            enriched_tickets = []
+            skip_count = 0
+
+            for ticket in new_tickets:
+                try:
+                    full_ticket = cw.get_ticket(ticket["id"])
+                except Exception:
+                    full_ticket = ticket  # fall back to slim ticket
+
+                enriched = detector.analyze_ticket(full_ticket)
+                ctx = enriched.get("_context", {})
+
+                if ctx.get("is_suppressed"):
+                    self._auto_acknowledge_suppressed(enriched, cw, config)
+                    skip_count += 1
+                else:
+                    enriched_tickets.append(enriched)
+
+            if skip_count:
+                self._broadcast(f"[Dispatcher] {skip_count} ticket(s) auto-suppressed")
+
+        except Exception as exc:
+            log.warning("[Dispatcher] PatternDetector failed (%s), falling back to individual dispatch", exc)
+            enriched_tickets = []
+            skip_count = 0
+            for ticket in new_tickets:
+                try:
+                    enriched_tickets.append(cw.get_ticket(ticket["id"]))
+                except Exception:
+                    enriched_tickets.append(ticket)
+
+        if not enriched_tickets:
+            self._broadcast(f"[Dispatcher] No actionable tickets ({skip_count} suppressed)")
+            return
+
+        # ── Build situational briefing ─────────────────────────────────────────
+        try:
+            from src.agent.briefing import build_situation_briefing
+            briefing = build_situation_briefing()
+        except Exception as exc:
+            log.warning("[Dispatcher] Could not build briefing: %s", exc)
+            briefing = ""
+
         # ── Create DispatchRun record ──────────────────────────────────────────
         run_id = self._create_run_record()
 
-        # ── Dispatch each ticket ───────────────────────────────────────────────
+        # ── Dispatch the batch ────────────────────────────────────────────────
         tickets_processed = 0
         tickets_assigned  = 0
         tickets_flagged   = 0
         errors            = 0
 
-        for ticket in new_tickets:
-            ticket_id = ticket.get("id")
-            if ticket_id is None:
-                continue
-
-            # Mark as processed immediately (so a crash doesn't cause re-processing)
-            with self._lock:
-                self._processed_ids.add(ticket_id)
-
-            try:
-                outcome = self._dispatch_ticket(ticket, config, mappings, cw, run_id)
-            except _RateLimitError as exc:
-                # Claude rate-limit — back off exponentially, then continue later
-                backoff = min(
-                    max(self._rate_limit_backoff * 2, _RATE_LIMIT_BASE),
-                    _RATE_LIMIT_MAX
-                )
-                self._rate_limit_backoff = backoff
-                self._rate_limit_until   = time.time() + backoff
-                msg = f"[Dispatcher] Claude rate limit — backing off {backoff:.0f}s"
-                log.warning(msg)
-                self._broadcast(msg)
-                errors += 1
-                break  # stop processing this batch; will retry remaining next cycle
-            except Exception as exc:
-                msg = f"[Dispatcher] Error dispatching ticket #{ticket_id}: {exc}"
-                log.error(msg, exc_info=True)
-                self._last_error = str(exc)
-                self._broadcast(msg)
-                errors += 1
-                continue  # skip this ticket, keep going
-
-            # Reset rate-limit back-off counter on success
-            self._rate_limit_backoff = 0.0
-
-            tickets_processed += 1
+        try:
+            outcome = self._dispatch_batch(
+                enriched_tickets, config, mappings, run_id, briefing
+            )
+            tickets_processed = len(enriched_tickets)
             status = outcome.get("status", "error")
             if status == "timeout":
-                # Flag the ticket for human review
-                self._flag_for_human_review(ticket_id, cw, config, mappings)
-                tickets_flagged += 1
+                for t in enriched_tickets:
+                    self._flag_for_human_review(t.get("id"), cw, config, mappings)
+                tickets_flagged = len(enriched_tickets)
             elif status == "ok":
-                if outcome.get("decisions_made"):
-                    tickets_assigned += 1
+                tickets_assigned = len(outcome.get("decisions_made", []))
             elif status == "error":
-                errors += 1
+                errors = 1
+
+            self._rate_limit_backoff = 0.0
 
             with self._lock:
-                self._tickets_today += 1
+                self._tickets_today += tickets_processed
+
+        except _RateLimitError as exc:
+            backoff = min(
+                max(self._rate_limit_backoff * 2, _RATE_LIMIT_BASE),
+                _RATE_LIMIT_MAX,
+            )
+            self._rate_limit_backoff = backoff
+            self._rate_limit_until   = time.time() + backoff
+            msg = f"[Dispatcher] Claude rate limit — backing off {backoff:.0f}s"
+            log.warning(msg)
+            self._broadcast(msg)
+            errors = 1
+        except Exception as exc:
+            msg = f"[Dispatcher] Batch dispatch error: {exc}"
+            log.error(msg, exc_info=True)
+            self._last_error = str(exc)
+            self._broadcast(msg)
+            errors = 1
 
         # ── Close DispatchRun record ───────────────────────────────────────────
         self._close_run_record(
@@ -341,45 +383,36 @@ class DispatcherService:
         self._broadcast(
             f"[Dispatcher] Cycle complete — "
             f"processed={tickets_processed} assigned={tickets_assigned} "
-            f"flagged={tickets_flagged} errors={errors}"
+            f"suppressed={skip_count} flagged={tickets_flagged} errors={errors}"
         )
         self._last_error = None
 
-    # ── Internal: dispatch one ticket ──────────────────────────────────────────
+    # ── Internal: dispatch the full batch ─────────────────────────────────────
 
-    def _dispatch_ticket(
+    def _dispatch_batch(
         self,
-        slim_ticket: Dict[str, Any],
+        enriched_tickets: List[Dict[str, Any]],
         config: Dict[str, Any],
         mappings: Dict[str, Any],
-        cw: Any,
         run_id: Optional[int],
+        briefing: str,
     ) -> Dict[str, Any]:
         """
-        Fetch the full ticket record and run the agent loop.
+        Run the batch agent loop on all enriched tickets.
         Raises _RateLimitError on Claude 429.
         """
-        from src.agent.loop import run_dispatch
+        from src.agent.loop import run_dispatch_batch
         from app.core.state import broadcast
 
-        ticket_id = slim_ticket["id"]
-        self._broadcast(f"[Dispatcher] → Fetching ticket #{ticket_id}: {slim_ticket.get('summary','')[:60]}")
-
-        # Get full ticket object (slim ticket from get_new_tickets is missing some fields)
-        try:
-            full_ticket = cw.get_ticket(ticket_id)
-        except Exception as exc:
-            raise  # propagates to caller
-
-        # Inject run_id into config so loop.py's log_dispatch_decision can link it
         cfg = {**config, "_run_id": run_id}
 
         try:
-            result = run_dispatch(
-                full_ticket,
+            result = run_dispatch_batch(
+                enriched_tickets,
                 config=cfg,
                 mappings=mappings,
                 broadcaster=broadcast,
+                briefing=briefing,
             )
         except Exception as exc:
             exc_str = str(exc).lower()
@@ -388,6 +421,34 @@ class DispatcherService:
             raise
 
         return result
+
+    # ── Internal: auto-acknowledge suppressed tickets ──────────────────────────
+
+    def _auto_acknowledge_suppressed(
+        self,
+        enriched_ticket: Dict[str, Any],
+        cw: Any,
+        config: Dict[str, Any],
+    ) -> None:
+        """Add an internal note to a suppressed ticket and skip assignment."""
+        ticket_id = enriched_ticket.get("id")
+        if ticket_id is None:
+            return
+        ctx = enriched_ticket.get("_context", {})
+        reason = ctx.get("suppressed_reason") or "suppressed per active incident"
+        inc_id = ctx.get("incident_id")
+        note = (
+            f"Auto-suppressed — {reason}."
+            + (f" Part of incident INC-{inc_id}." if inc_id else "")
+        )
+        self._broadcast(f"[Dispatcher] Suppressed ticket #{ticket_id}: {reason}")
+        if config.get("dry_run", True):
+            self._broadcast(f"[Dispatcher][DRY RUN] Would add suppress note to #{ticket_id}")
+            return
+        try:
+            cw.add_ticket_note(ticket_id, note, internal_analysis_flag=True)
+        except Exception as exc:
+            log.warning("[Dispatcher] Could not add suppress note to #%s: %s", ticket_id, exc)
 
     # ── Internal: DB helpers ───────────────────────────────────────────────────
 

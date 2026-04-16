@@ -35,8 +35,9 @@ def create_app() -> Flask:
     # want the dispatcher running in the worker — or once if debug=False.
     if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         try:
-            from src.clients.database import init_db
+            from src.clients.database import init_db, migrate_db
             init_db()
+            migrate_db()
             log.info("Database initialised successfully")
         except Exception as exc:
             log.critical("DB init failed: %s", exc)

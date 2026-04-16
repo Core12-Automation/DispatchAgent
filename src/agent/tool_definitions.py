@@ -593,10 +593,120 @@ _MEMORY: List[Dict[str, Any]] = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CONTEXTUAL / INCIDENT tools
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CONTEXTUAL: List[Dict[str, Any]] = [
+    {
+        "name": "suppress_alert",
+        "description": (
+            "Suppress further tickets matching this incident's fingerprint for a "
+            "specified number of hours.  Suppressed tickets will be auto-acknowledged "
+            "in ConnectWise with an internal note, but NOT assigned to anyone.  "
+            "Use when: an operator note authorises suppression, or a repeat alert "
+            "storm has been assigned and further duplicates should be silenced.  "
+            "Always log your decision with log_dispatch_decision after calling this."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "incident_id": {
+                    "type": "integer",
+                    "description": "The active_incidents.id of the incident to suppress.",
+                },
+                "duration_hours": {
+                    "type": "number",
+                    "description": "How many hours to suppress.  Use 0 for indefinite (until manually resolved).",
+                    "minimum": 0,
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Why this incident is being suppressed (added as internal note).",
+                },
+            },
+            "required": ["incident_id", "duration_hours", "reason"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "group_with_incident",
+        "description": (
+            "Link a new ticket to an existing active incident instead of treating it "
+            "as a separate issue.  The ticket will NOT get a new tech assignment — "
+            "it is already being handled under the incident.  Use when: a ticket's "
+            "_context shows is_repeat=true and the incident has a tech already_assigned_to.  "
+            "This is preferred over assign_ticket for duplicate tickets."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticket_id": {
+                    "type": "integer",
+                    "description": "The CW ticket ID to group.",
+                },
+                "incident_id": {
+                    "type": "integer",
+                    "description": "The active_incidents.id to group this ticket under.",
+                },
+            },
+            "required": ["ticket_id", "incident_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_active_incidents",
+        "description": (
+            "Get all active (non-resolved) incidents, optionally filtered by client name.  "
+            "Use this to check whether an ongoing issue is already tracked before "
+            "deciding how to handle a new ticket.  Returns id, incident_key, status, "
+            "occurrence_count, assigned_tech, and ticket_ids."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "client_name": {
+                    "type": "string",
+                    "description": "Optional: filter incidents by company name.",
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "resolve_incident",
+        "description": (
+            "Mark an incident as resolved.  Future tickets with the same fingerprint "
+            "will start a fresh incident.  Call this when the root cause is fixed and "
+            "no more related tickets are expected.  Clears any active suppression."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "incident_id": {
+                    "type": "integer",
+                    "description": "The active_incidents.id to resolve.",
+                },
+                "resolution_notes": {
+                    "type": "string",
+                    "description": "Optional notes describing how the incident was resolved.",
+                },
+            },
+            "required": ["incident_id"],
+            "additionalProperties": False,
+        },
+    },
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Combined export
 # ─────────────────────────────────────────────────────────────────────────────
 
-TOOL_DEFINITIONS: List[Dict[str, Any]] = _PERCEPTION + _ACTION + _MEMORY
+TOOL_DEFINITIONS: List[Dict[str, Any]] = _PERCEPTION + _ACTION + _MEMORY + _CONTEXTUAL
 
 # Quick lookup by name
 TOOL_NAMES = {t["name"] for t in TOOL_DEFINITIONS}
+
+# Contextual tool names (for reference)
+CONTEXTUAL_TOOL_NAMES = {t["name"] for t in _CONTEXTUAL}

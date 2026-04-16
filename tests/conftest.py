@@ -147,7 +147,7 @@ def mock_config():
         "route_from_statuses": ["New", "New (Email connector)"],
         "unrouted_owner_identifiers": ["DispatchBot", "AutoAssign"],
         "claude_model": "claude-sonnet-4-6",
-        "max_tech_workload": 5,
+        "max_tech_workload_pct": 0.40,
         "dispatch_interval_seconds": 60,
         "mappings_path": "data/mappings.json",
     }

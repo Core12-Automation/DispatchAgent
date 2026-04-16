@@ -127,5 +127,82 @@ def dispatch_run_single():
 
     result = result_holder[0] if result_holder else {"status": "error", "error": "No result"}
 
+    # ── Persist reasoning trace ───────────────────────────────────────────────
+    try:
+        from src.clients.database import AgentTrace, SessionLocal
+        trace_rec = AgentTrace(
+            ticket_id=result.get("ticket_id", ticket_id),
+            ticket_summary=(ticket.get("summary") or "")[:500],
+            status=result.get("status", "error"),
+            iterations=result.get("iterations", 0),
+            elapsed_seconds=result.get("elapsed_seconds"),
+            was_dry_run=result.get("dry_run", True),
+        )
+        trace_rec.trace = result.get("reasoning_trace", [])
+        with SessionLocal() as session:
+            session.add(trace_rec)
+            session.commit()
+    except Exception:
+        pass  # Never fail the response over trace persistence
+
     status_code = 200 if result.get("status") == "ok" else 207
     return jsonify(result), status_code
+
+
+@bp.route("/api/dispatch/traces", methods=["GET"])
+def list_traces():
+    """
+    Return the most recent agent traces (default last 50).
+
+    Query params:
+        limit   int   max rows to return (default 50, max 200)
+        ticket  int   filter by ticket_id
+    """
+    from src.clients.database import AgentTrace, SessionLocal
+
+    limit = min(int(request.args.get("limit", 50)), 200)
+    ticket_filter = request.args.get("ticket")
+
+    with SessionLocal() as session:
+        q = session.query(AgentTrace).order_by(AgentTrace.created_at.desc())
+        if ticket_filter:
+            try:
+                q = q.filter(AgentTrace.ticket_id == int(ticket_filter))
+            except ValueError:
+                pass
+        rows = q.limit(limit).all()
+        return jsonify([
+            {
+                "id":              r.id,
+                "ticket_id":       r.ticket_id,
+                "ticket_summary":  r.ticket_summary,
+                "status":          r.status,
+                "iterations":      r.iterations,
+                "elapsed_seconds": r.elapsed_seconds,
+                "was_dry_run":     r.was_dry_run,
+                "created_at":      r.created_at.isoformat(),
+            }
+            for r in rows
+        ])
+
+
+@bp.route("/api/dispatch/traces/<int:trace_id>", methods=["GET"])
+def get_trace(trace_id: int):
+    """Return the full reasoning trace for a specific trace record."""
+    from src.clients.database import AgentTrace, SessionLocal
+
+    with SessionLocal() as session:
+        rec = session.get(AgentTrace, trace_id)
+        if rec is None:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({
+            "id":              rec.id,
+            "ticket_id":       rec.ticket_id,
+            "ticket_summary":  rec.ticket_summary,
+            "status":          rec.status,
+            "iterations":      rec.iterations,
+            "elapsed_seconds": rec.elapsed_seconds,
+            "was_dry_run":     rec.was_dry_run,
+            "created_at":      rec.created_at.isoformat(),
+            "trace":           rec.trace,
+        })

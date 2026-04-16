@@ -106,10 +106,15 @@ class Technician(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     cw_member_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True)
+    # CW login identifier, e.g. "jsmith" — used as the primary lookup key from the UI
+    cw_identifier: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     # Graph user ID used for Teams presence lookups
     teams_user_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    # Dispatch routing fields
+    routable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # JSON arrays stored as TEXT, e.g. ["networking", "azure_ad"]
     _skills: Mapped[Optional[str]] = mapped_column("skills", Text, nullable=True)
@@ -120,6 +125,7 @@ class Technician(Base):
     total_tickets_handled: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -244,8 +250,186 @@ class DispatchRun(Base):
         )
 
 
+class ActiveIncident(Base):
+    """
+    Tracks groups of tickets that share the same alert fingerprint.
+    Powers repeat/storm detection and suppression.
+    """
+
+    __tablename__ = "active_incidents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # Normalised SHA256 fingerprint that identifies this class of alert
+    incident_key: Mapped[str] = mapped_column(String(16), unique=True, nullable=False, index=True)
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    # JSON array of CW ticket IDs grouped under this incident
+    _ticket_ids: Mapped[Optional[str]] = mapped_column("ticket_ids", Text, nullable=True)
+    occurrence_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # "new" | "monitoring" | "assigned" | "suppressed" | "resolved"
+    status: Mapped[str] = mapped_column(String(20), default="new", nullable=False)
+    assigned_tech_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    suppressed_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    suppressed_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    @property
+    def ticket_ids(self) -> List[int]:
+        return _from_json(self._ticket_ids) or []
+
+    @ticket_ids.setter
+    def ticket_ids(self, value: List[int]) -> None:
+        self._ticket_ids = _to_json(value)
+
+    def __repr__(self) -> str:
+        return (
+            f"<ActiveIncident id={self.id} key={self.incident_key!r} "
+            f"status={self.status!r} count={self.occurrence_count}>"
+        )
+
+
+class OperatorNote(Base):
+    """
+    Human-authored instructions that modify dispatch behaviour.
+    Loaded into every Claude prompt via the situation briefing.
+    """
+
+    __tablename__ = "operator_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_text: Mapped[str] = mapped_column(Text, nullable=False)
+    # "global" | "client" | "tech" | "incident"
+    scope: Mapped[str] = mapped_column(String(20), default="global", nullable=False)
+    # e.g. client company name, tech identifier, incident key
+    scope_ref: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(100), default="operator", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    # NULL = permanent (until manually deleted)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
+    # JSON array of tag strings
+    _tags: Mapped[Optional[str]] = mapped_column("tags", Text, nullable=True)
+
+    @property
+    def tags(self) -> List[str]:
+        return _from_json(self._tags) or []
+
+    @tags.setter
+    def tags(self, value: List[str]) -> None:
+        self._tags = _to_json(value)
+
+    def __repr__(self) -> str:
+        return (
+            f"<OperatorNote id={self.id} scope={self.scope!r} "
+            f"scope_ref={self.scope_ref!r} active={self.is_active}>"
+        )
+
+
+class AgentMemory(Base):
+    """
+    Key-value working memory for the dispatch agent.
+    Persists state between dispatch cycles.
+    """
+
+    __tablename__ = "agent_memory"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # e.g. "incident:abc123:last_action"
+    key: Mapped[str] = mapped_column(String(500), unique=True, nullable=False, index=True)
+    # JSON-encoded value
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    # "incident" | "suppression" | "pattern" | "cycle_state"
+    category: Mapped[str] = mapped_column(String(40), default="cycle_state", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<AgentMemory id={self.id} key={self.key!r} category={self.category!r}>"
+
+
+class AgentTrace(Base):
+    """
+    Full reasoning trace for a single ticket dispatch run.
+    Stored as a JSON list of events (text turns, tool calls, done marker).
+    """
+
+    __tablename__ = "agent_traces"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    ticket_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(40), default="ok", nullable=False)
+    iterations: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    elapsed_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    was_dry_run: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    _trace: Mapped[Optional[str]] = mapped_column("trace_json", Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    @property
+    def trace(self) -> List[Dict[str, Any]]:
+        return _from_json(self._trace) or []
+
+    @trace.setter
+    def trace(self, value: List[Dict[str, Any]]) -> None:
+        self._trace = _to_json(value)
+
+    def __repr__(self) -> str:
+        return (
+            f"<AgentTrace id={self.id} ticket_id={self.ticket_id} "
+            f"status={self.status!r} iterations={self.iterations}>"
+        )
+
+
 # ── Initialiser ───────────────────────────────────────────────────────────────
+
+def migrate_db() -> None:
+    """
+    Add columns introduced after the initial schema creation.
+    Uses PRAGMA table_info to skip columns that already exist (idempotent).
+    """
+    from sqlalchemy import text
+
+    technician_columns = [
+        ("cw_identifier", "TEXT"),
+        ("routable",      "INTEGER DEFAULT 1 NOT NULL"),
+        ("description",   "TEXT"),
+    ]
+
+    with _engine.connect() as conn:
+        rows = conn.execute(text("PRAGMA table_info(technicians)")).fetchall()
+        existing = {row[1] for row in rows}
+        for col_name, col_def in technician_columns:
+            if col_name not in existing:
+                conn.execute(text(f"ALTER TABLE technicians ADD COLUMN {col_name} {col_def}"))
+        conn.commit()
+
 
 def init_db() -> None:
     """Create all tables that don't yet exist. Safe to call multiple times."""
     Base.metadata.create_all(bind=_engine)
+    migrate_db()

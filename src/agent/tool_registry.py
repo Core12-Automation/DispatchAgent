@@ -189,6 +189,11 @@ class ToolRegistry:
             "update_tech_profile":      self._update_tech_profile,
             "log_dispatch_decision":    self._log_dispatch_decision,
             "get_similar_past_tickets": self._get_similar_past_tickets,
+            # CONTEXTUAL / INCIDENT
+            "suppress_alert":           self._suppress_alert,
+            "group_with_incident":      self._group_with_incident,
+            "get_active_incidents":     self._get_active_incidents,
+            "resolve_incident":         self._resolve_incident,
         }
         if name not in table:
             raise ValueError(f"Unknown tool: {name!r}")
@@ -247,7 +252,7 @@ class ToolRegistry:
             self._cw,
             self._mappings,
             member_id=member_id,
-            max_workload_threshold=int(self._config.get("max_tech_workload", 5)),
+            max_workload_pct=float(self._config.get("max_tech_workload_pct", 0.40)),
         )
         # Ensure identifier is always present
         result.setdefault("identifier", ident)
@@ -623,6 +628,180 @@ class ToolRegistry:
             summary=inp["query"],
             limit=inp.get("limit", 5),
         )
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # CONTEXTUAL / INCIDENT implementations
+    # ═════════════════════════════════════════════════════════════════════════
+
+    def _suppress_alert(self, inp: Dict) -> Dict:
+        """Suppress an active incident for N hours."""
+        from src.clients.database import SessionLocal, ActiveIncident
+        from datetime import datetime, timedelta, timezone
+
+        incident_id: int = int(inp["incident_id"])
+        duration_hours: float = float(inp["duration_hours"])
+        reason: str = inp["reason"]
+
+        now = datetime.now(timezone.utc)
+        suppressed_until = (
+            now + timedelta(hours=duration_hours)
+            if duration_hours > 0
+            else None  # indefinite
+        )
+
+        try:
+            with SessionLocal() as session:
+                incident = session.get(ActiveIncident, incident_id)
+                if incident is None:
+                    return {"ok": False, "error": f"Incident {incident_id} not found"}
+
+                incident.status = "suppressed"
+                incident.suppressed_until = suppressed_until
+                incident.suppressed_reason = reason
+                incident.updated_at = now
+                session.commit()
+
+            until_str = (
+                suppressed_until.strftime("%Y-%m-%d %H:%M UTC")
+                if suppressed_until else "further notice"
+            )
+            return {
+                "ok": True,
+                "incident_id": incident_id,
+                "suppressed_until": until_str,
+                "reason": reason,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "incident_id": incident_id}
+
+    def _group_with_incident(self, inp: Dict) -> Dict:
+        """Link a ticket to an existing incident (no new assignment)."""
+        from src.clients.database import SessionLocal, ActiveIncident, Technician
+        from datetime import datetime, timezone
+
+        ticket_id: int = int(inp["ticket_id"])
+        incident_id: int = int(inp["incident_id"])
+
+        try:
+            with SessionLocal() as session:
+                incident = session.get(ActiveIncident, incident_id)
+                if incident is None:
+                    return {"ok": False, "error": f"Incident {incident_id} not found"}
+
+                # Append ticket_id if not already listed
+                ids = incident.ticket_ids
+                if ticket_id not in ids:
+                    incident.ticket_ids = ids + [ticket_id]
+                    incident.occurrence_count += 1
+                incident.last_seen = datetime.now(timezone.utc)
+                session.commit()
+
+                # Resolve assigned tech name for the CW note
+                tech_name = None
+                if incident.assigned_tech_id:
+                    tech = session.get(Technician, incident.assigned_tech_id)
+                    if tech:
+                        tech_name = tech.name
+
+            # Add internal note to the CW ticket
+            cw_note = (
+                f"Grouped with incident INC-{incident_id} — already being handled"
+                + (f" by {tech_name}" if tech_name else "")
+                + f". Incident key: {incident.incident_key}"
+            )
+            if not self._dry_run:
+                try:
+                    self._cw.add_ticket_note(
+                        ticket_id,
+                        cw_note,
+                        internal_analysis_flag=True,
+                    )
+                except Exception as exc:
+                    log.warning("Could not add group note to ticket #%s: %s", ticket_id, exc)
+            else:
+                self._broadcast(f"[DRY RUN] Would add group note to ticket #{ticket_id}: {cw_note}")
+
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "incident_id": incident_id,
+                "tech_name": tech_name,
+                "note_added": cw_note,
+                "dry_run": self._dry_run,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "ticket_id": ticket_id}
+
+    def _get_active_incidents(self, inp: Dict) -> Dict:
+        """Return all non-resolved incidents, optionally filtered by client."""
+        from src.clients.database import SessionLocal, ActiveIncident, Technician
+
+        client_name: Optional[str] = inp.get("client_name")
+
+        try:
+            with SessionLocal() as session:
+                q = session.query(ActiveIncident).filter(
+                    ActiveIncident.status.notin_(["resolved"])
+                )
+                rows = q.order_by(ActiveIncident.last_seen.desc()).limit(50).all()
+
+                results = []
+                for r in rows:
+                    tech_name = None
+                    if r.assigned_tech_id:
+                        tech = session.get(Technician, r.assigned_tech_id)
+                        if tech:
+                            tech_name = tech.name
+
+                    results.append({
+                        "id":              r.id,
+                        "incident_key":    r.incident_key,
+                        "status":          r.status,
+                        "occurrence_count": r.occurrence_count,
+                        "first_seen":      r.first_seen.isoformat() if r.first_seen else None,
+                        "last_seen":       r.last_seen.isoformat() if r.last_seen else None,
+                        "assigned_tech":   tech_name,
+                        "ticket_ids":      r.ticket_ids,
+                        "suppressed_until": r.suppressed_until.isoformat() if r.suppressed_until else None,
+                    })
+
+            return {"ok": True, "incidents": results, "total": len(results)}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "incidents": []}
+
+    def _resolve_incident(self, inp: Dict) -> Dict:
+        """Mark an incident as resolved."""
+        from src.clients.database import SessionLocal, ActiveIncident
+        from datetime import datetime, timezone
+
+        incident_id: int = int(inp["incident_id"])
+        resolution_notes: Optional[str] = inp.get("resolution_notes")
+
+        try:
+            with SessionLocal() as session:
+                incident = session.get(ActiveIncident, incident_id)
+                if incident is None:
+                    return {"ok": False, "error": f"Incident {incident_id} not found"}
+
+                incident.status = "resolved"
+                incident.suppressed_until = None
+                incident.suppressed_reason = None
+                if resolution_notes:
+                    existing = incident.notes or ""
+                    incident.notes = (
+                        (existing + "\n" if existing else "") + resolution_notes
+                    )
+                incident.updated_at = datetime.now(timezone.utc)
+                session.commit()
+
+            return {
+                "ok": True,
+                "incident_id": incident_id,
+                "status": "resolved",
+                "resolution_notes": resolution_notes,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "incident_id": incident_id}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

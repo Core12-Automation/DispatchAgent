@@ -178,7 +178,7 @@ def get_technician_workload(
     *,
     member_id: Optional[int] = None,
     all_techs: bool = False,
-    max_workload_threshold: int = 5,
+    max_workload_pct: float = 0.40,
 ) -> Dict[str, Any]:
     """
     Return open-ticket counts and oldest-ticket age for one or all techs.
@@ -188,71 +188,89 @@ def get_technician_workload(
     once and groups by owner — more efficient than N serial API calls.
 
     Args:
-        cw:                     CWManageClient instance.
-        mappings:               Mappings dict (members, agent_routing).
-        member_id:              CW member ID for single-tech mode.
-        all_techs:              Return all routable techs if True.
-        max_workload_threshold: Flag "overloaded" above this count.
+        cw:                CWManageClient instance.
+        mappings:          Mappings dict (members, agent_routing).
+        member_id:         CW member ID for single-tech mode.
+        all_techs:         Return all routable techs if True.
+        max_workload_pct:  Fraction of total open tickets above which a tech
+                           is considered overloaded (e.g. 0.40 = 40%).
 
     Returns (single-tech):
         {
           "member_id": int, "identifier": str,
           "open_tickets": int, "by_priority": {...},
           "oldest_ticket_age_hours": float|null,
-          "overloaded": bool
+          "overloaded": bool,
+          "workload_threshold": int,   # computed ticket count limit
+          "total_open_tickets": int,
+          "workload_pct_limit": float,
         }
 
     Returns (all-techs):
         {
           "techs": [ ... same per-tech dicts ... ],
-          "total_open": int
+          "total_open": int,
+          "workload_threshold": int,
+          "workload_pct_limit": float,
         }
     """
     if member_id is not None and not all_techs:
-        return _single_tech_workload(cw, mappings, member_id, max_workload_threshold)
+        return _single_tech_workload(cw, mappings, member_id, max_workload_pct)
 
     # All-techs mode: one big fetch, group locally
-    return _all_techs_workload(cw, mappings, max_workload_threshold)
+    return _all_techs_workload(cw, mappings, max_workload_pct)
 
 
 def _single_tech_workload(
     cw,
     mappings: Dict[str, Any],
     member_id: int,
-    threshold: int,
+    pct: float,
 ) -> Dict[str, Any]:
-    conditions = f"owner/id = {int(member_id)} AND closedFlag = false"
+    import math
+    # Fetch all open tickets to get a system-wide total for threshold computation,
+    # then filter locally to this tech's tickets.
     try:
-        tickets = cw.fetch_all_tickets(conditions=conditions, page_size=200)
+        all_tickets = cw.fetch_all_tickets(conditions="closedFlag = false", page_size=200)
     except Exception as exc:
         return {"member_id": member_id, "error": str(exc), "open_tickets": 0}
 
+    total_open = len(all_tickets)
+    threshold = max(1, math.ceil(total_open * pct))
+
+    tech_tickets = [
+        t for t in all_tickets
+        if (t.get("owner") or {}).get("id") == member_id
+    ]
+
     by_priority: Dict[str, int] = {}
     oldest_hours: Optional[float] = None
-    for t in tickets:
+    for t in tech_tickets:
         p = (t.get("priority") or {}).get("name") or "Unknown"
         by_priority[p] = by_priority.get(p, 0) + 1
         age = _age_hours(t.get("dateEntered"))
         if age is not None and (oldest_hours is None or age > oldest_hours):
             oldest_hours = age
 
-    # Reverse-lookup identifier
     ident = _reverse_member_lookup(mappings, member_id)
 
     return {
         "member_id":               member_id,
         "identifier":              ident,
-        "open_tickets":            len(tickets),
+        "open_tickets":            len(tech_tickets),
         "by_priority":             by_priority,
         "oldest_ticket_age_hours": oldest_hours,
-        "overloaded":              len(tickets) >= threshold,
+        "overloaded":              len(tech_tickets) >= threshold,
+        "workload_threshold":      threshold,
+        "total_open_tickets":      total_open,
+        "workload_pct_limit":      pct,
     }
 
 
 def _all_techs_workload(
     cw,
     mappings: Dict[str, Any],
-    threshold: int,
+    pct: float,
 ) -> Dict[str, Any]:
     """
     Fetch ALL open tickets once, group by owner, return per-tech counts.
@@ -282,6 +300,7 @@ def _all_techs_workload(
         return {"techs": [], "total_open": 0, "error": "No routable techs in mappings"}
 
     # Fetch all open tickets across all boards
+    import math
     try:
         all_tickets = cw.fetch_all_tickets(
             conditions="closedFlag = false",
@@ -290,6 +309,9 @@ def _all_techs_workload(
         )
     except Exception as exc:
         return {"techs": [], "total_open": 0, "error": str(exc)}
+
+    total_open = len(all_tickets)
+    threshold = max(1, math.ceil(total_open * pct))
 
     # Group by owner member_id
     buckets: Dict[int, List[Dict]] = {mid: [] for mid in routable}
@@ -327,15 +349,18 @@ def _all_techs_workload(
             "by_priority":             by_priority,
             "oldest_ticket_age_hours": oldest_hours,
             "overloaded":              len(tickets) >= threshold,
+            "workload_threshold":      threshold,
         })
 
     # Sort by open_tickets ascending (least loaded first)
     techs.sort(key=lambda x: x["open_tickets"])
 
     return {
-        "techs":             techs,
-        "total_open":        sum(len(v) for v in buckets.values()),
-        "unassigned_count":  unassigned_count,
+        "techs":              techs,
+        "total_open":         sum(len(v) for v in buckets.values()),
+        "unassigned_count":   unassigned_count,
+        "workload_threshold": threshold,
+        "workload_pct_limit": pct,
     }
 
 

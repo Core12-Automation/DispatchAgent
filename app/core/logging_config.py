@@ -98,13 +98,21 @@ def configure_logging() -> None:
     # ── Quiet excessively noisy third-party loggers ───────────────────────────
     for name in (
         "werkzeug",
-        "apscheduler.executors.default",
-        "apscheduler.scheduler",
         "urllib3.connectionpool",
         "anthropic._base_client",
         "httpx",
     ):
         logging.getLogger(name).setLevel(logging.WARNING)
+
+    # APScheduler "max instances reached" fires every interval when a cycle is
+    # still running — this is expected behaviour (coalesce=True, max_instances=1)
+    # and does not indicate a problem.  Suppress below ERROR.
+    for name in (
+        "apscheduler.executors.default",
+        "apscheduler.scheduler",
+        "apscheduler.job",
+    ):
+        logging.getLogger(name).setLevel(logging.ERROR)
 
     root._dispatch_logging_configured = True  # type: ignore[attr-defined]
 
